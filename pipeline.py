@@ -172,21 +172,21 @@ if __name__ == "__main__":
     parser.add_argument(
         '--data_atlas_dir',
         type=str,
-        default=os.path.normpath(os.path.join(script_dir, '../data/atlas')),
+        default=os.path.normpath(os.path.join(script_dir, '../MIALab_2020_Dataset/atlas')),
         help='Directory with atlas data.'
     )
 
     parser.add_argument(
         '--data_train_dir',
         type=str,
-        default=os.path.normpath(os.path.join(script_dir, '../data/train/')),
+        default=os.path.normpath(os.path.join(script_dir, '../MIALab_2020_Dataset/train/')),
         help='Directory with training data.'
     )
 
     parser.add_argument(
         '--data_test_dir',
         type=str,
-        default=os.path.normpath(os.path.join(script_dir, '../data/test/')),
+        default=os.path.normpath(os.path.join(script_dir, '../MIALab_2020_Dataset/test/')),
         help='Directory with testing data.'
     )
 
