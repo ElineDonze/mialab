@@ -1,7 +1,7 @@
-pathos
-pymia
-matplotlib
-numpy<2.4  # pymia uses np.in1d, removed in newer numpy
-Pillow
-scikit-learn
-SimpleITK
+pathos==0.3.5
+pymia==0.3.4
+matplotlib==3.11.2
+numpy==2.3.5  # pymia uses np.in1d, removed in numpy 2.4
+Pillow==13.0.0
+scikit-learn==1.9.1
+SimpleITK==2.5.6
