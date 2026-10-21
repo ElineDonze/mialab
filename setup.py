@@ -12,7 +12,7 @@ with open("LICENSE") as f:
     license_ = f.read()
 
 REQUIRED_PACKAGES = [
-    "pymia == 0.3.1",
+    "pymia >= 0.3.1",
     "scikit-learn >= 0.23.2",
     "pathos >= 0.2.6",
 ]
