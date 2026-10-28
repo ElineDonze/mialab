@@ -1,0 +1,25 @@
+# Default experiment: the original exercise settings.
+# Copy this file to create a new experiment and change only what differs.
+# Settings left out of a file keep the values shown here.
+
+name = "default"
+seed = 42  # fixes the random voxel sampling and the random forest, so runs are repeatable
+
+[preprocessing]
+registration = true
+skullstrip = true
+normalization = true
+
+[features]
+coordinates = true
+intensity = true
+gradient_intensity = true
+
+[random_forest]
+n_estimators = 1
+max_depth = 5
+max_features = "all"  # "all", "sqrt", "log2" or a number of features
+n_jobs = 1            # CPU cores used for training; -1 uses all cores
+
+[postprocessing]
+simple = true

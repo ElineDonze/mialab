@@ -4,10 +4,10 @@ The pipeline is used for brain tissue segmentation using a decision forest class
 """
 import argparse
 import datetime
+import json
 import os
 import sys
 import timeit
-import warnings
 
 import SimpleITK as sitk
 import sklearn.ensemble as sk_ensemble
@@ -17,12 +17,14 @@ import pymia.evaluation.writer as writer
 
 try:
     import mialab.data.structure as structure
+    import mialab.utilities.config as cfg
     import mialab.utilities.file_access_utilities as futil
     import mialab.utilities.pipeline_utilities as putil
 except ImportError:
     # Append the MIALab root directory to Python path
     sys.path.insert(0, os.path.join(os.path.dirname(sys.argv[0]), '..'))
     import mialab.data.structure as structure
+    import mialab.utilities.config as cfg
     import mialab.utilities.file_access_utilities as futil
     import mialab.utilities.pipeline_utilities as putil
 
@@ -33,7 +35,7 @@ LOADING_KEYS = [structure.BrainImageTypes.T1w,
                 structure.BrainImageTypes.RegistrationTransform]  # the list of data we will load
 
 
-def main(result_dir: str, data_atlas_dir: str, data_train_dir: str, data_test_dir: str):
+def main(config_file: str, result_dir: str, data_atlas_dir: str, data_train_dir: str, data_test_dir: str):
     """Brain tissue segmentation using decision forests.
 
     The main routine executes the medical image analysis pipeline:
@@ -46,7 +48,15 @@ def main(result_dir: str, data_atlas_dir: str, data_train_dir: str, data_test_di
         - Segmentation using the decision forest classifier model on unseen images
         - Post-processing of the segmentation
         - Evaluation of the segmentation
+
+    All experiment settings (pre-processing, features, random forest) are read from the config file.
     """
+
+    config = cfg.load_config(config_file)
+    print('-' * 5, 'Experiment:', config['name'], f'({config_file})')
+
+    # fix the random voxel sampling of the training data
+    np.random.seed(config['seed'])
 
     # load atlas images
     putil.load_atlas_images(data_atlas_dir)
@@ -58,12 +68,7 @@ def main(result_dir: str, data_atlas_dir: str, data_train_dir: str, data_test_di
                                           LOADING_KEYS,
                                           futil.BrainImageFilePathGenerator(),
                                           futil.DataDirectoryFilter())
-    pre_process_params = {'skullstrip_pre': True,
-                          'normalization_pre': True,
-                          'registration_pre': True,
-                          'coordinates_feature': True,
-                          'intensity_feature': True,
-                          'gradient_intensity_feature': True}
+    pre_process_params = cfg.pre_process_params(config)
 
     # load images for training and pre-process
     images = putil.pre_process_batch(crawler.data, pre_process_params, multi_process=False)
@@ -72,19 +77,18 @@ def main(result_dir: str, data_atlas_dir: str, data_train_dir: str, data_test_di
     data_train = np.concatenate([img.feature_matrix[0] for img in images])
     labels_train = np.concatenate([img.feature_matrix[1] for img in images]).squeeze()
 
-    warnings.warn('Random forest parameters not properly set.')
-    forest = sk_ensemble.RandomForestClassifier(max_features=images[0].feature_matrix[0].shape[1],
-                                                n_estimators=1,
-                                                max_depth=5)
+    forest = sk_ensemble.RandomForestClassifier(**cfg.random_forest_params(config))
 
     start_time = timeit.default_timer()
     forest.fit(data_train, labels_train)
     print(' Time elapsed:', timeit.default_timer() - start_time, 's')
 
-    # create a result directory with timestamp
+    # create a result directory with timestamp and experiment name, and save all settings used in this run
     t = datetime.datetime.now().strftime('%Y-%m-%d-%H-%M-%S')
-    result_dir = os.path.join(result_dir, t)
+    result_dir = os.path.join(result_dir, t + '_' + config['name'])
     os.makedirs(result_dir, exist_ok=True)
+    with open(os.path.join(result_dir, 'config_used.json'), 'w') as f:
+        json.dump(config, f, indent=4)
 
     print('-' * 5, 'Testing...')
 
@@ -124,7 +128,7 @@ def main(result_dir: str, data_atlas_dir: str, data_train_dir: str, data_test_di
         images_probabilities.append(image_probabilities)
 
     # post-process segmentation and evaluate with post-processing
-    post_process_params = {'simple_post': True}
+    post_process_params = {'simple_post': config['postprocessing']['simple']}
     images_post_processed = putil.post_process_batch(images_test, images_prediction, images_probabilities,
                                                      post_process_params, multi_process=True)
 
@@ -163,6 +167,13 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Medical image analysis pipeline for brain tissue segmentation')
 
     parser.add_argument(
+        '--config',
+        type=str,
+        default=os.path.normpath(os.path.join(script_dir, './configs/default.toml')),
+        help='Experiment config file (TOML).'
+    )
+
+    parser.add_argument(
         '--result_dir',
         type=str,
         default=os.path.normpath(os.path.join(script_dir, './mia-result')),
@@ -191,4 +202,4 @@ if __name__ == "__main__":
     )
 
     args = parser.parse_args()
-    main(args.result_dir, args.data_atlas_dir, args.data_train_dir, args.data_test_dir)
+    main(args.config, args.result_dir, args.data_atlas_dir, args.data_train_dir, args.data_test_dir)
