@@ -10,6 +10,18 @@ import SimpleITK as sitk
 import numpy as np
 
 
+class ImageNormalizationParameters(pymia_fltr.FilterParams):
+    """Image normalization parameters."""
+
+    def __init__(self, img_mask: sitk.Image):
+        """Initializes a new instance of the ImageNormalizationParameters
+
+        Args:
+            img_mask (sitk.Image): The brain mask image.
+        """
+        self.img_mask = img_mask
+
+
 class ImageNormalization(pymia_fltr.Filter):
     """Represents a normalization filter."""
 
@@ -17,33 +29,28 @@ class ImageNormalization(pymia_fltr.Filter):
         """Initializes a new instance of the ImageNormalization class."""
         super().__init__()
 
-    def execute(self, image: sitk.Image, params: pymia_fltr.FilterParams = None) -> sitk.Image:
+    def execute(self, image: sitk.Image, params: ImageNormalizationParameters = None) -> sitk.Image:
         """Executes a normalization on an image.
 
         Args:
             image (sitk.Image): The image.
-            params (FilterParams): The parameters (unused).
+            params (ImageNormalizationParameters): The parameters with the brain mask.
 
         Returns:
             sitk.Image: The normalized image.
         """
 
-        img_arr = sitk.GetArrayFromImage(image)
-
-        # todo: normalize the image using numpy
-        
         img_arr = sitk.GetArrayFromImage(image).astype(np.float32)
-       # z-score normalization (ED I am not sure if it's the best solution the z-score, 
-       # and normalization is done after skull stripping therefore background might influ normalization. 
-       # one solution could be to normalize inside the brain mask)
-        mean  = img_arr.mean()
-        std = img_arr.std()
-        if std > 0:
-            img_arr = (img_arr - mean) / std
-        else:
-            img_arr = img_arr - mean  # if std is zero, just subtract the mean
-        # this line is just a placeholder to avoid errors
-        img_out = sitk.GetImageFromArray(img_arr)
+        mask_arr = sitk.GetArrayFromImage(params.img_mask) > 0
+
+        # z-score normalization using the brain voxels only
+        brain = img_arr[mask_arr]
+        std = brain.std()
+
+        img_out_arr = np.zeros_like(img_arr)  # background stays 0
+        img_out_arr[mask_arr] = (brain - brain.mean()) / (std if std > 0 else 1)
+
+        img_out = sitk.GetImageFromArray(img_out_arr)
         img_out.CopyInformation(image)
 
         return img_out
