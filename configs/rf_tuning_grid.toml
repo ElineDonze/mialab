@@ -4,6 +4,6 @@
 n_splits = 5  # folds; subjects are split into groups, so no subject is in both training and validation
 
 [random_forest]
-n_estimators = [10, 50, 100, 200]
-max_depth = [10, 20, 30, "none"]
-max_features = ["sqrt", "all"]
+n_estimators = [25, 50, 100]
+max_depth = [20, 30, "none"]
+max_features = ["sqrt"]
