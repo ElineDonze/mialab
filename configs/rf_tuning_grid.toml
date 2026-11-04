@@ -1,0 +1,9 @@
+# Random forest settings to compare with rf_tuning.py.
+# Every combination of the values below is evaluated with cross-validation on the training subjects only.
+
+n_splits = 5  # folds; subjects are split into groups, so no subject is in both training and validation
+
+[random_forest]
+n_estimators = [25, 50, 100]
+max_depth = [20, 30, "none"]
+max_features = ["sqrt"]
