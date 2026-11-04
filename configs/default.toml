@@ -17,7 +17,7 @@ gradient_intensity = true
 
 [random_forest]
 n_estimators = 1
-max_depth = 5
+max_depth = 5         # a number, or "none" for unlimited depth
 max_features = "all"  # "all", "sqrt", "log2" or a number of features
 n_jobs = 1            # CPU cores used for training; -1 uses all cores
 

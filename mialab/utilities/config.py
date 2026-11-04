@@ -91,10 +91,11 @@ def random_forest_params(config: dict) -> dict:
         dict: The random forest parameters.
     """
     forest = config['random_forest']
-    # 'all' considers every feature at each split; sklearn expresses this as None
+    # TOML has no null value, so 'all' (every feature at each split) and 'none' (unlimited depth) stand for None
     max_features = None if forest['max_features'] == 'all' else forest['max_features']
+    max_depth = None if forest['max_depth'] == 'none' else forest['max_depth']
     return {'n_estimators': forest['n_estimators'],
-            'max_depth': forest['max_depth'],
+            'max_depth': max_depth,
             'max_features': max_features,
             'n_jobs': forest['n_jobs'],
             'random_state': config['seed']}
