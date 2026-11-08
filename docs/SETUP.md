@@ -89,6 +89,20 @@ python pipeline.py
 - Results are written to `mia-result/<date-time>/` (`results.csv`, `results_summary.csv`).
 - Reference Dice scores for the unchanged pipeline (1 tree, depth 5): white matter about 0.61, grey matter about 0.44, hippocampus / amygdala / thalamus 0.00. Small differences are normal because the random forest is random.
 
+### Running an experiment with a config file
+
+All experiment settings (pre-processing steps, features, random forest parameters, random seed) are in TOML files in the `configs/` folder. Without `--config`, the pipeline uses `configs/default.toml`.
+
+```bash
+python pipeline.py --config configs/default.toml
+```
+
+To create a new experiment, copy `configs/default.toml`, give it a new `name`, and change only the settings you need. Settings left out of a file keep their default values, and a misspelled setting stops the run with an error.
+
+Do not edit `configs/default.toml` to try things out: it holds the shared baseline settings and is only changed through a pull request that the team agrees on.
+
+Each run creates `mia-result/<date-time>_<name>/` and saves the complete settings used in `config_used.json`, so every result can be traced back to its configuration. With the same config and seed, the results are identical.
+
 ## 7. Testing a pull request
 
 Test a pull request in a **separate folder**, so your own unfinished work is not affected. Open a terminal in the parent folder (the one that contains `MIALab_2020_Dataset`), then:
