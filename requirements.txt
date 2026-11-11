@@ -4,4 +4,5 @@ matplotlib==3.11.2
 numpy==2.3.5  # pymia uses np.in1d, removed in numpy 2.4
 Pillow==13.0.0
 scikit-learn==1.9.1
+scipy==1.17.1  # used by analysis/ (Spearman correlation, Wilcoxon test)
 SimpleITK==2.5.6
