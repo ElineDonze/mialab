@@ -11,9 +11,14 @@ skullstrip = true
 normalization = true
 
 [features]
+# one switch per feature group; every group lives in its own file in mialab/features/
 coordinates = true
 intensity = true
 gradient_intensity = true
+
+# parameters of a feature group, e.g.
+# [feature_params.texture]
+# radius = 2
 
 [random_forest]
 n_estimators = 1
@@ -22,4 +27,4 @@ max_features = "all"  # "all", "sqrt", "log2" or a number of features
 n_jobs = 1            # CPU cores used for training; -1 uses all cores
 
 [postprocessing]
-simple = true
+simple = true  # not used by pipeline.py: the course post-processing does nothing yet

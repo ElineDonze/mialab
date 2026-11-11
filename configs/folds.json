@@ -1,0 +1,37 @@
+{
+    "description": "Fixed subject-wise cross-validation folds of the training subjects. Each list holds the validation subjects of one fold. Created by scripts/make_folds.py.",
+    "seed": 42,
+    "n_folds": 5,
+    "folds": [
+        [
+            "101915",
+            "106016",
+            "113619",
+            "113922"
+        ],
+        [
+            "103111",
+            "103414",
+            "105115",
+            "114419"
+        ],
+        [
+            "100408",
+            "108828",
+            "111716",
+            "116524"
+        ],
+        [
+            "101309",
+            "103818",
+            "111312",
+            "115320"
+        ],
+        [
+            "100307",
+            "101107",
+            "105014",
+            "110411"
+        ]
+    ]
+}

@@ -81,27 +81,30 @@ Expected output ends with: `Everything seems to work fine!`
 
 ## 6. Run the pipeline
 
+Quick check of the whole pipeline on 3 training subjects (about 2 minutes on a laptop):
+
 ```bash
-python pipeline.py
+python pipeline.py --smoke
 ```
 
-- It takes several minutes and prints many warnings. This is expected while the exercise TODOs (normalization, skull stripping, registration, T2 features) are not implemented yet.
-- Results are written to `mia-result/<date-time>/` (`results.csv`, `results_summary.csv`).
-- Reference Dice scores for the unchanged pipeline (1 tree, depth 5): white matter about 0.61, grey matter about 0.44, hippocampus / amygdala / thalamus 0.00. Small differences are normal because the random forest is random.
+A full experiment runs 5-fold cross-validation on the 20 training subjects; run it on UBELIX, not on the laptop:
+
+```bash
+sbatch ubelix/run_pipeline.sbatch --config configs/experiments/E0_baseline.toml
+```
+
+- Pre-processed images and features are cached in `../cache/`, so they are computed only once.
+- Each run writes a small folder `../runs/<date>_<time>_<config name>_<user>/` (settings, code version, Dice and
+  HD95 per subject) and its segmentations to `../outputs/<same name>/`.
+- The test subjects are only used with `--final-test`; see [CONTRIBUTING.md](../CONTRIBUTING.md).
 
 ### Running an experiment with a config file
 
-All experiment settings (pre-processing steps, features, random forest parameters, random seed) are in TOML files in the `configs/` folder. Without `--config`, the pipeline uses `configs/default.toml`.
+All experiment settings (pre-processing steps, feature groups, random forest parameters, random seed) are in TOML files in the `configs/` folder. Without `--config`, the pipeline uses `configs/default.toml`.
 
-```bash
-python pipeline.py --config configs/default.toml
-```
-
-To create a new experiment, copy `configs/default.toml`, give it a new `name`, and change only the settings you need. Settings left out of a file keep their default values, and a misspelled setting stops the run with an error.
+To create a new experiment, copy a file of `configs/experiments/`, give it a new `name`, and change only the settings you need. Settings left out of a file keep their default values, and a misspelled setting stops the run with an error.
 
 Do not edit `configs/default.toml` to try things out: it holds the shared baseline settings and is only changed through a pull request that the team agrees on.
-
-Each run creates `mia-result/<date-time>_<name>/` and saves the complete settings used in `config_used.json`, so every result can be traced back to its configuration. With the same config and seed, the results are identical.
 
 ## 7. Testing a pull request
 

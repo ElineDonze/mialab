@@ -184,6 +184,10 @@ cython_debug/
 MIALab_2020_Dataset/
 data/
 mia-result/
+mia-cache/
+runs/
+outputs/
+cache/
 *.nii
 *.nii.gz
 *.mha

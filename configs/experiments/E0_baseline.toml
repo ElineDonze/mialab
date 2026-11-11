@@ -1,0 +1,16 @@
+# E0: the baseline, 7 features (atlas coordinates, T1w/T2w intensity, T1w/T2w gradient magnitude).
+# Random forest settings: the best setting of rf_tuning.py (cross-validation on the training subjects).
+# Settings not listed here keep the values of configs/default.toml.
+
+name = "E0_baseline"
+
+[features]
+coordinates = true
+intensity = true
+gradient_intensity = true
+
+[random_forest]
+n_estimators = 100
+max_depth = "none"
+max_features = "sqrt"
+n_jobs = -1  # all cores; does not change the results
