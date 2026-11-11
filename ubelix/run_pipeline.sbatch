@@ -2,7 +2,7 @@
 # Runs pipeline.py (or another script of the repository) as a Slurm job on UBELIX.
 # Submit it from inside the repository; all arguments are passed on:
 #
-#     sbatch ubelix/run_pipeline.sbatch --config configs/experiments/rf_check/E0_baseline_rf50.toml
+#     sbatch ubelix/run_pipeline.sbatch --config configs/experiments/E0_baseline.toml
 #     sbatch ubelix/run_pipeline.sbatch --smoke
 #     sbatch --export=ALL,SCRIPT=analysis/correlation_map.py ubelix/run_pipeline.sbatch --config <config>
 #
