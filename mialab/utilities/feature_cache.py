@@ -16,6 +16,9 @@ Rules that keep the cache correct:
 - The training voxels are sampled once per subject with a fixed seed, so every feature group and every run uses
   the same voxels.
 - The test subjects are stored under their own split folder and are only processed for a final test run.
+- Fold-dependent groups (e.g. a probabilistic atlas) are fitted on the training subjects of the fold only. A
+  training subject itself gets features from a fit on the other training subjects (leave-one-out), so its
+  features are as "unseen" as those of a validation or test subject.
 """
 import concurrent.futures
 import hashlib
@@ -119,7 +122,11 @@ class FeatureCache:
     def load_images(self, subject_id: str, labels: bool = False) -> t.Dict[str, sitk.Image]:
         """Loads the pre-processed images of a subject. The labels are only included if asked for."""
         names = ['T1w', 'T2w', 'BrainMask'] + (['GroundTruth'] if labels else [])
-        return {name: sitk.ReadImage(self._image_path(subject_id, name)) for name in names}
+        return {name: self.load_image(subject_id, name) for name in names}
+
+    def load_image(self, subject_id: str, name: str) -> sitk.Image:
+        """Loads one pre-processed image of a subject: 'T1w', 'T2w', 'BrainMask' or 'GroundTruth'."""
+        return sitk.ReadImage(self._image_path(subject_id, name))
 
     def reference_image(self, subject_id: str) -> sitk.Image:
         """An image with the geometry of the subject in atlas space, used to save segmentations."""
@@ -170,8 +177,8 @@ class FeatureCache:
             group: The feature group.
             subject_ids: The subjects to compute the features for.
             fit_cache: For a fold-dependent group: the cache of the training subjects it is fitted on.
-            fit_ids: For a fold-dependent group: the training subjects of the fold. Must never contain a
-                subject of ``subject_ids`` that is evaluated in this fold.
+            fit_ids: For a fold-dependent group: the training subjects of the fold. A subject that is itself in
+                ``fit_ids`` gets features from a fit on the other subjects of ``fit_ids`` (leave-one-out).
         """
         if group.fold_dependent and not fit_ids:
             raise ValueError(f'Feature group "{group.name}" is fold dependent and needs fit_ids')
@@ -181,12 +188,23 @@ class FeatureCache:
         self.ensure_preprocessed(missing)
         for s in missing:
             self.voxels(s)
-        if group.fold_dependent:
-            fit_cache = fit_cache or self
-            group.fit(list(fit_ids), features.FitContext(lambda s: fit_cache.load_images(s, labels=True)))
         print('-' * 5, f'Computing feature group "{group.name}" for {len(missing)} subject(s)...', flush=True)
-        tasks = [(self, s, group, self._feature_path(s, group, fit_ids)) for s in missing]
-        self._run(_feature_task, tasks)
+        if not group.fold_dependent:
+            self._run(_feature_task, [(self, s, group, self._feature_path(s, group)) for s in missing])
+            return
+
+        fit_cache = fit_cache or self
+        context = features.FitContext(fit_cache.load_image)
+        # training subjects of the fold: fitted without their own labels (leave-one-out), one after the other
+        in_fit = [s for s in missing if fit_cache is self and s in fit_ids]
+        for s in in_fit:
+            group.fit([i for i in fit_ids if i != s], context)
+            _feature_task(self, s, group, self._feature_path(s, group, fit_ids))
+        # validation or test subjects: fitted once on all training subjects of the fold
+        others = [s for s in missing if s not in in_fit]
+        if others:
+            group.fit(list(fit_ids), context)
+            self._run(_feature_task, [(self, s, group, self._feature_path(s, group, fit_ids)) for s in others])
 
     def load_features(self, subject_id: str, group: features.FeatureGroup,
                       fit_ids: t.List[str] = None) -> t.Tuple[np.ndarray, t.List[str]]:

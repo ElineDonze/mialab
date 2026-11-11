@@ -7,13 +7,14 @@
 #     sbatch --export=ALL,SCRIPT=analysis/correlation_map.py ubelix/run_pipeline.sbatch --config <config>
 #
 # The job log is written to <project>/logs/<job name>_<job id>.out.
-# Change resources on the command line if needed, e.g. sbatch --time=12:00:00 --mem=64G ...
+# Change resources on the command line if needed, e.g. sbatch --time=12:00:00 --mem=32G ...
+# (E0 with 7 features used about 1.3 GB of memory and 4 minutes.)
 
 #SBATCH --job-name=mialab
 #SBATCH --partition=epyc2
 #SBATCH --nodes=1
 #SBATCH --cpus-per-task=16
-#SBATCH --mem=48G
+#SBATCH --mem=16G
 #SBATCH --time=08:00:00
 #SBATCH --output=../logs/%x_%j.out
 

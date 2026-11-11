@@ -19,6 +19,7 @@ Example:
     python pipeline.py --config configs/experiments/E0_baseline.toml
 """
 import argparse
+import copy
 import json
 import os
 import sys
@@ -29,7 +30,6 @@ import SimpleITK as sitk
 import sklearn.ensemble as sk_ensemble
 
 try:
-    import mialab.data.structure as structure
     import mialab.features as features
     import mialab.utilities.config as cfg
     import mialab.utilities.feature_cache as fcache
@@ -39,7 +39,6 @@ try:
 except ImportError:
     # Append the MIALab root directory to Python path
     sys.path.insert(0, os.path.join(os.path.dirname(sys.argv[0]), '..'))
-    import mialab.data.structure as structure
     import mialab.features as features
     import mialab.utilities.config as cfg
     import mialab.utilities.feature_cache as fcache
@@ -47,11 +46,6 @@ except ImportError:
     import mialab.utilities.pipeline_utilities as putil
     import mialab.utilities.run_log as run_log
 
-LOADING_KEYS = [structure.BrainImageTypes.T1w,
-                structure.BrainImageTypes.T2w,
-                structure.BrainImageTypes.GroundTruth,
-                structure.BrainImageTypes.BrainMask,
-                structure.BrainImageTypes.RegistrationTransform]  # the list of data we will load (used by rf_tuning)
 
 METRIC_NAMES = {'DICE': 'dice', 'HDRFDST': 'hd95'}
 
@@ -143,46 +137,75 @@ def summarize(rows: list) -> list:
 
 
 def check_final_test_allowed(config: dict, runs_dir: str):
-    """Refuses a second final test run of the same config, so the test set is only used once per config."""
+    """Refuses a second final test run of the same config, so the test set is used only once per config.
+
+    A started final test counts even if it failed, because test results may have been printed already.
+    """
     if not os.path.isdir(runs_dir):
         return
-    earlier = [d for d in os.listdir(runs_dir) if d.endswith('_FINALTEST') and f'_{config["name"]}_' in d]
+    earlier = []
+    for run_name in sorted(os.listdir(runs_dir)):
+        info_file = os.path.join(runs_dir, run_name, 'run_info.json')
+        if os.path.isfile(info_file):
+            with open(info_file) as f:
+                info = json.load(f)
+            if info.get('mode') == 'final_test' and info.get('config_name') == config['name']:
+                earlier.append(run_name)
     if earlier:
         raise RuntimeError(f'Config "{config["name"]}" was already evaluated on the test set: {earlier}. '
                            'The test set is used only once per config.')
 
 
-def main(args):
-    config = cfg.load_config(args.config)
-    mode = 'final_test' if args.final_test else 'smoke' if args.smoke else 'cv'
-    print('-' * 5, 'Experiment:', config['name'], f'({args.config}), mode: {mode}')
+def check_config_name(config: dict, config_file: str):
+    """Requires that an experiment config is named like its file, so run folders are easy to match to configs."""
+    experiments_dir = os.path.abspath(os.path.join(paths.REPO_DIR, 'configs', 'experiments'))
+    in_experiments = os.path.abspath(config_file).startswith(experiments_dir + os.sep)
+    stem = os.path.splitext(os.path.basename(config_file))[0]
+    if in_experiments and config['name'] != stem:
+        raise ValueError(f'The name in {config_file} is "{config["name"]}" but must be the file name "{stem}"')
+
+
+def run_experiment(config: dict, mode: str = 'cv', config_file: str = '', data_dir: str = paths.DATA_DIR,
+                   cache_dir: str = paths.CACHE_DIR, runs_dir: str = paths.RUNS_DIR,
+                   outputs_dir: str = paths.OUTPUTS_DIR, workers: int = 1) -> run_log.Run:
+    """Runs one experiment and writes its run folder.
+
+    Args:
+        config: The complete experiment config.
+        mode: 'cv' (cross-validation on the training subjects), 'smoke' (3 training subjects) or 'final_test'.
+        config_file: The config file, recorded in the run folder.
+
+    Returns:
+        run_log.Run: The finished run; ``run.info`` holds the main results.
+    """
+    if mode not in ('cv', 'smoke', 'final_test'):
+        raise ValueError(f'Unknown mode "{mode}"')
+    config = copy.deepcopy(config)
     if mode == 'smoke':
         config['name'] += '_smoke'
     if mode == 'final_test':
-        check_final_test_allowed(config, args.runs_dir)
+        check_final_test_allowed(config, runs_dir)
 
     groups = [features.create(name, config['feature_params'][name]) for name in cfg.enabled_feature_groups(config)]
     if not groups:
         raise ValueError('No feature group is switched on in the config')
-    train_cache = fcache.FeatureCache(config, 'train', args.data_dir, args.cache_dir, args.workers)
+    train_cache = fcache.FeatureCache(config, 'train', data_dir, cache_dir, workers)
 
-    run = run_log.Run(config, mode, args.runs_dir, args.outputs_dir)
+    run = run_log.Run(config, mode, runs_dir, outputs_dir, config_file)
     print('-' * 5, 'Run folder:', run.dir, flush=True)
     try:
-        rows, importances = [], []
+        rows, importances, names = [], [], []
         if mode == 'final_test':
-            test_cache = fcache.FeatureCache(config, 'test', args.data_dir, args.cache_dir, args.workers)
-            r, imp, names = train_and_evaluate(config, groups, train_cache, train_cache.subject_ids,
-                                               test_cache, test_cache.subject_ids, run, 'test')
-            rows, importances = r, imp
+            test_cache = fcache.FeatureCache(config, 'test', data_dir, cache_dir, workers)
+            rows, importances, names = train_and_evaluate(config, groups, train_cache, train_cache.subject_ids,
+                                                          test_cache, test_cache.subject_ids, run, 'test')
         else:
             if mode == 'smoke':
-                ids = train_cache.subject_ids[:3]
-                folds = [ids[2:]]
-                all_ids = ids
+                all_ids = train_cache.subject_ids[:3]
+                folds = [all_ids[2:]]
             else:
-                folds = load_folds(train_cache.subject_ids)
                 all_ids = train_cache.subject_ids
+                folds = load_folds(all_ids)
             for k, val_ids in enumerate(folds):
                 train_ids = [s for s in all_ids if s not in val_ids]
                 r, imp, names = train_and_evaluate(config, groups, train_cache, train_ids,
@@ -204,9 +227,41 @@ def main(args):
         mean = summary[-1]
         run.finish(n_features=len(names), feature_groups=[g.name for g in groups],
                    mean_dice=mean['dice_mean'], mean_hd95=mean['hd95_mean'])
+        return run
     except BaseException as error:
         run.fail(error)
         raise
+
+
+def dry_run(config: dict, mode: str, args):
+    """Prints what a run would do, without computing or writing anything."""
+    groups = cfg.enabled_feature_groups(config)
+    print('Mode:          ', mode)
+    print('Feature groups:', ', '.join(f'{g} {config["feature_params"][g] or ""}'.strip() for g in groups))
+    print('Random forest: ', cfg.random_forest_params(config))
+    print('Data:          ', args.data_dir, '(found)' if os.path.isdir(args.data_dir) else '(NOT FOUND)')
+    print('Cache:         ', args.cache_dir)
+    print('Runs:          ', args.runs_dir)
+    print('Outputs:       ', args.outputs_dir)
+    if mode == 'cv':
+        with open(paths.FOLDS_FILE) as f:
+            folds = json.load(f)['folds']
+        print('Folds:         ', ', '.join(f'{len(fold)} subjects' for fold in folds))
+    if mode == 'final_test':
+        check_final_test_allowed(config, args.runs_dir)
+        print('Final test:     allowed (this config was not evaluated on the test set yet)')
+
+
+def main(args):
+    config = cfg.load_config(args.config)
+    check_config_name(config, args.config)
+    mode = 'final_test' if args.final_test else 'smoke' if args.smoke else 'cv'
+    print('-' * 5, 'Experiment:', config['name'], f'({args.config}), mode: {mode}')
+    if args.dry_run:
+        dry_run(config, mode, args)
+        return
+    run_experiment(config, mode, args.config, args.data_dir, args.cache_dir, args.runs_dir, args.outputs_dir,
+                   args.workers)
 
 
 if __name__ == '__main__':
@@ -223,6 +278,8 @@ if __name__ == '__main__':
                                  'Only for the final runs fixed in advance.')
     mode_group.add_argument('--smoke', action='store_true',
                             help='Quick check on 3 training subjects (train on 2, validate on 1).')
+    parser.add_argument('--dry-run', action='store_true',
+                        help='Only print what the run would do (feature groups, settings, folders).')
     parser.add_argument('--workers', type=int, default=max(1, slurm_cpus // 4) if slurm_cpus else 1,
                         help='Subjects pre-processed in parallel (default: 1, or CPUs/4 in a Slurm job).')
     parser.add_argument('--data_dir', type=str, default=paths.DATA_DIR, help='Dataset folder.')

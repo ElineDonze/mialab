@@ -15,7 +15,7 @@ The dataset must be in the **parent folder** of the repository, not inside it. T
 └── mialab/                <- this repository
 ```
 
-The dataset, image files (`.nii.gz`, `.mha`, ...), `mia-result/`, zip files and cached features/models are listed in `.gitignore`, so they cannot be committed by accident. The repository is public, so please never force-add them.
+The dataset, image files (`.nii.gz`, `.mha`, ...), `mia-result/`, `runs/`, `outputs/`, `cache/`, zip files and cached features/models are listed in `.gitignore`, so they cannot be committed by accident. The repository is public, so please never force-add them.
 
 ## 2. Install uv
 

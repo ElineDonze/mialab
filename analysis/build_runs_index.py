@@ -38,6 +38,7 @@ def index_row(run_dir: str) -> dict:
            'status': info.get('status', ''),
            'mode': info.get('mode', ''),
            'config_name': info.get('config_name', ''),
+           'config_file': info.get('config_file', ''),
            'user': info.get('user', ''),
            'started': info.get('started', ''),
            'duration_min': info.get('duration_min', ''),

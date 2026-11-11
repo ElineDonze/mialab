@@ -9,6 +9,7 @@ therefore works on every laptop and on every UBELIX account without editing path
         cache/                     pre-processed images and features, computed once and reused
         runs/                      one small folder per run (configs, metrics); copied to OneDrive
         outputs/                   large files per run (segmentations); stay where they were computed
+        figures/                   plots made by the scripts in analysis/
 
 Every path can be changed with an environment variable, e.g. ``MIALAB_DATA=/some/where``.
 """
@@ -32,6 +33,7 @@ DATA_DIR = os.environ.get('MIALAB_DATA') or _first_existing([
 CACHE_DIR = os.environ.get('MIALAB_CACHE', os.path.join(PROJECT_DIR, 'cache'))
 RUNS_DIR = os.environ.get('MIALAB_RUNS', os.path.join(PROJECT_DIR, 'runs'))
 OUTPUTS_DIR = os.environ.get('MIALAB_OUTPUTS', os.path.join(PROJECT_DIR, 'outputs'))
+FIGURES_DIR = os.environ.get('MIALAB_FIGURES', os.path.join(PROJECT_DIR, 'figures'))
 
 FOLDS_FILE = os.path.join(REPO_DIR, 'configs', 'folds.json')
 

@@ -188,6 +188,7 @@ mia-cache/
 runs/
 outputs/
 cache/
+figures/
 *.nii
 *.nii.gz
 *.mha

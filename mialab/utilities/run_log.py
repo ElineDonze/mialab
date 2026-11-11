@@ -23,10 +23,10 @@ import mialab.utilities.paths as paths
 
 
 def _git(*args) -> str:
+    """Runs a git command in the repository and returns its output ('' if git is not available)."""
     try:
-        return subprocess.run(['git', *args], cwd=paths.REPO_DIR, capture_output=True, text=True,
-                              check=True).stdout.strip()
-    except (OSError, subprocess.CalledProcessError):
+        return subprocess.run(['git', *args], cwd=paths.REPO_DIR, capture_output=True, text=True).stdout.strip()
+    except OSError:
         return ''
 
 
@@ -34,7 +34,7 @@ class Run:
     """A run folder in runs/ and outputs/."""
 
     def __init__(self, config: dict, mode: str, runs_dir: str = paths.RUNS_DIR,
-                 outputs_dir: str = paths.OUTPUTS_DIR):
+                 outputs_dir: str = paths.OUTPUTS_DIR, config_file: str = ''):
         self.started = datetime.datetime.now()
         user = os.environ.get('MIALAB_USER') or getpass.getuser()
         self.name = f'{self.started:%Y-%m-%d_%H-%M-%S}_{config["name"]}_{user}'
@@ -47,7 +47,8 @@ class Run:
         os.makedirs(self.dir)
         os.makedirs(self.outputs_dir)
 
-        self.info = {'run': self.name, 'mode': mode, 'config_name': config['name'], 'user': user,
+        self.info = {'run': self.name, 'mode': mode, 'config_name': config['name'],
+                     'config_file': os.path.relpath(config_file, paths.REPO_DIR) if config_file else '', 'user': user,
                      'host': socket.gethostname(), 'started': self.started.isoformat(timespec='seconds'),
                      'slurm_job_id': os.environ.get('SLURM_JOB_ID', ''), 'command': ' '.join(sys.argv),
                      'status': 'running'}
@@ -73,16 +74,26 @@ class Run:
             writer.writerows(rows)
 
     def _write_code_version(self):
+        """Saves the commit, and every change that is not committed yet (also new files), so the run can be repeated."""
         commit = _git('rev-parse', 'HEAD')
         branch = _git('rev-parse', '--abbrev-ref', 'HEAD')
-        changes = _git('status', '--porcelain', '--untracked-files=no')
+        changed = _git('status', '--porcelain', '--untracked-files=no')
+        untracked = [f for f in _git('ls-files', '--others', '--exclude-standard').splitlines() if f]
+        dirty = bool(changed or untracked)
         with open(self.path('commit.txt'), 'w') as f:
             f.write(f'commit: {commit or "unknown"}\nbranch: {branch}\n'
-                    f'uncommitted changes: {"yes, see uncommitted.patch" if changes else "no"}\n')
-        if changes:
+                    f'uncommitted changes: {"yes, see uncommitted.patch" if dirty else "no"}\n')
+            if untracked:
+                f.write('new files not in git yet:\n' + ''.join(f'    {u}\n' for u in untracked))
+        if dirty:
+            patch = [_git('diff', 'HEAD')]
+            # new files as a diff against an empty file (git understands /dev/null on every OS)
+            patch += [_git('diff', '--no-index', '--', '/dev/null', u) for u in untracked]
             with open(self.path('uncommitted.patch'), 'w') as f:
-                f.write(_git('diff', 'HEAD'))
-        self.info.update({'commit': commit, 'uncommitted_changes': bool(changes)})
+                f.write('\n'.join(p for p in patch if p) + '\n')
+            print('WARNING: the code has uncommitted changes. They are saved in uncommitted.patch, but please '
+                  'commit before runs that you report.', flush=True)
+        self.info.update({'commit': commit, 'uncommitted_changes': dirty})
 
     def _write_environment(self):
         packages = sorted(f'{d.metadata["Name"]}=={d.version}' for d in importlib.metadata.distributions()

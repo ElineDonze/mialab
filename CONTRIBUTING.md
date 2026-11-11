@@ -21,15 +21,18 @@ MIA_Lab_Project/
     code/                     this repository (on the laptop it may be called mialab/)
     data/MIALab_2020_Dataset/
     envs/mialab/              Python environment (UBELIX)
-    cache/  runs/  outputs/  logs/
+    cache/  runs/  outputs/  figures/  logs/
 ```
 
 Set up UBELIX once with `bash ubelix/setup_ubelix.sh`.
 
 ## 2. Running experiments
 
-- One experiment = one config file in `configs/experiments/`, e.g. `E1_texture.toml`. Its `name` is used in the run
-  folder name. Never change a config after it was used for a reported run; copy it instead.
+- One experiment = one config file in `configs/experiments/`, e.g. `E1_texture.toml`. Its `name` must be the file
+  name (`name = "E1_texture"`); the pipeline refuses a run otherwise. Never change a config after it was used for a
+  reported run; copy it instead.
+- Check a new config before submitting: `python pipeline.py --config <config> --dry-run` prints the feature groups,
+  the random forest settings and the folders, without computing anything.
 - Run on UBELIX: `sbatch ubelix/run_pipeline.sbatch --config configs/experiments/E1_texture.toml`.
 - Try new code first with `--smoke` (3 subjects, a few minutes).
 - Commit your code before a run that you report. The commit is saved in the run folder; uncommitted changes are
@@ -48,7 +51,9 @@ Set up UBELIX once with `bash ubelix/setup_ubelix.sh`.
 Anything that **learns from data** must be learned from the training subjects of the current fold only:
 probabilistic atlas, PCA, feature selection (top-k), correlation filter, scalers, autoencoders.
 For a feature group, set `fold_dependent = True` and learn in `fit()`; the pipeline then fits it again in every fold.
-Feature groups never receive the labels in `compute()`.
+A training subject gets its features from a fit on the *other* training subjects of the fold (leave-one-out), so its
+features are as "unseen" as those of a validation or test subject. Feature groups never receive the labels in
+`compute()`.
 
 ## 5. Adding a feature group
 
@@ -57,7 +62,8 @@ Feature groups never receive the labels in `compute()`.
    `mialab/features/__init__.py`. Do not change other groups' files.
 3. Give every parameter a default in `defaults`. Increase `version` whenever you change how a group is computed,
    so old cached values are not reused.
-4. Add a config in `configs/experiments/` that switches the group on, run `--smoke`, then open a pull request.
+4. Add a config in `configs/experiments/` that switches the group on, run `python test/test_configs.py` and
+   `python pipeline.py --config <config> --smoke`, then open a pull request.
 
 ## 6. Results
 
@@ -69,4 +75,6 @@ Each run writes `runs/<date>_<time>_<config name>_<user>/` with `config_used.jso
 - Never edit files inside a run folder.
 - `python analysis/build_runs_index.py --runs_dir <OneDrive runs folder>` rebuilds `runs_index.csv`.
 - All analysis and figures are made by scripts in `analysis/` from the saved files, so nothing has to be trained
-  again: `compare_runs.py` (paired Wilcoxon test), `correlation_map.py` (feature correlation).
+  again: `compare_runs.py` (paired Wilcoxon test), `plot_results.py` (boxplots of one or more runs, saved in
+  `figures/`), `correlation_map.py` (feature correlation).
+- Random forest settings are compared with `python rf_tuning.py --config <config>`: one normal run per setting.

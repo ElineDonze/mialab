@@ -48,9 +48,13 @@ class FeatureGroup:
     def fit(self, train_ids: t.List[str], context: 'FitContext'):
         """Learns from the training subjects. Only called if ``fold_dependent`` is True.
 
+        The pipeline calls ``fit`` once for the validation (or test) subjects, with all training subjects of the
+        fold, and once for every training subject, with the other training subjects only (leave-one-out). So no
+        subject ever gets features from something that was learned from its own labels.
+
         Args:
-            train_ids (list of str): The ids of the training subjects of the current fold.
-            context (FitContext): Gives access to the pre-processed images of the training subjects.
+            train_ids (list of str): The ids of the subjects to learn from.
+            context (FitContext): Gives access to the pre-processed images of these subjects, including labels.
         """
         raise NotImplementedError(f'Feature group "{self.name}" is fold dependent but has no fit method')
 
@@ -69,14 +73,21 @@ class FeatureGroup:
 
 
 class FitContext:
-    """Gives a fold-dependent feature group access to the pre-processed training subjects."""
+    """Gives a fold-dependent feature group access to the pre-processed images of the training subjects.
 
-    def __init__(self, load_images: t.Callable[[str], t.Dict[str, sitk.Image]]):
-        self._load_images = load_images
+    Images are kept in memory after the first use, because leave-one-out fitting reads them many times.
+    """
 
-    def images(self, subject_id: str) -> t.Dict[str, sitk.Image]:
-        """Returns the pre-processed images of a training subject, including its labels ('GroundTruth')."""
-        return self._load_images(subject_id)
+    def __init__(self, load_image: t.Callable[[str, str], sitk.Image]):
+        self._load_image = load_image
+        self._memory = {}
+
+    def image(self, subject_id: str, name: str) -> sitk.Image:
+        """Returns one pre-processed image of a training subject: 'T1w', 'T2w', 'BrainMask' or 'GroundTruth'."""
+        key = (subject_id, name)
+        if key not in self._memory:
+            self._memory[key] = self._load_image(subject_id, name)
+        return self._memory[key]
 
 
 # The groups are imported here, after FeatureGroup is defined, because they subclass it.
