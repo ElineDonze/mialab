@@ -11,6 +11,7 @@
 
 #SBATCH --job-name=mialab
 #SBATCH --partition=epyc2
+#SBATCH --nodes=1
 #SBATCH --cpus-per-task=16
 #SBATCH --mem=48G
 #SBATCH --time=08:00:00
