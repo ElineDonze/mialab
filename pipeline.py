@@ -16,7 +16,7 @@ Pre-processed images and features are cached (see mialab/utilities/feature_cache
 once. Each run writes a small folder in runs/ and its segmentations in outputs/ (see run_log.py).
 
 Example:
-    python pipeline.py --config configs/experiments/E0_baseline.toml
+    python pipeline.py --config configs/experiments/rf_check/E0_baseline_rf50.toml
 """
 import argparse
 import json

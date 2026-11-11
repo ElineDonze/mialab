@@ -90,7 +90,7 @@ python pipeline.py --smoke
 A full experiment runs 5-fold cross-validation on the 20 training subjects; run it on UBELIX, not on the laptop:
 
 ```bash
-sbatch ubelix/run_pipeline.sbatch --config configs/experiments/E0_baseline.toml
+sbatch ubelix/run_pipeline.sbatch --config configs/experiments/rf_check/E0_baseline_rf50.toml
 ```
 
 - Pre-processed images and features are cached in `../cache/`, so they are computed only once.
