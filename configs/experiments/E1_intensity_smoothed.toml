@@ -1,0 +1,16 @@
+# E1: the baseline (7 features) plus the feature group "intensity_smoothed".
+# Random forest as in E0 (configs/experiments/E0_baseline.toml).
+
+name = "E1_intensity_smoothed"
+
+[features]
+coordinates = true
+intensity = true
+gradient_intensity = true
+intensity_smoothed = true
+
+[random_forest]
+n_estimators = 100
+max_depth = "none"
+max_features = "sqrt"
+n_jobs = -1  # all cores; does not change the results

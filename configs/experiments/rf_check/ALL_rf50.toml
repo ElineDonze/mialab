@@ -1,0 +1,20 @@
+# Choice of the number of trees with all feature groups (79 features): 50 trees.
+# Settings not listed here keep the values of configs/default.toml.
+
+name = "ALL_rf50"
+
+[features]
+coordinates = true
+intensity = true
+gradient_intensity = true
+intensity_smoothed = true
+gradient_multiscale = true
+texture = true
+spatial = true
+glcm = true
+
+[random_forest]
+n_estimators = 50
+max_depth = "none"
+max_features = "sqrt"
+n_jobs = -1  # all cores; does not change the results
