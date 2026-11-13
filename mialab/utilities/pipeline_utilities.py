@@ -166,14 +166,13 @@ class FeatureExtractor:
         return image.reshape((no_voxels, number_of_components))
 
 
-def pre_process(id_: str, paths: dict, **kwargs) -> structure.BrainImage:
-    """Loads and processes an image.
+def pre_process_images(id_: str, paths: dict, **kwargs) -> structure.BrainImage:
+    """Loads and pre-processes an image, without feature extraction.
 
     The processing includes:
 
     - Registration
-    - Pre-processing
-    - Feature extraction
+    - Pre-processing (skull stripping, normalization)
 
     Args:
         id_ (str): An image identifier.
@@ -254,6 +253,28 @@ def pre_process(id_: str, paths: dict, **kwargs) -> structure.BrainImage:
 
     # update image properties to atlas image properties after registration
     img.image_properties = conversion.ImageProperties(img.images[structure.BrainImageTypes.T1w])
+
+    return img
+
+
+def pre_process(id_: str, paths: dict, **kwargs) -> structure.BrainImage:
+    """Loads and processes an image.
+
+    The processing includes:
+
+    - Registration
+    - Pre-processing
+    - Feature extraction
+
+    Args:
+        id_ (str): An image identifier.
+        paths (dict): A dict, where the keys are an image identifier of type structure.BrainImageTypes
+            and the values are paths to the images.
+
+    Returns:
+        (structure.BrainImage):
+    """
+    img = pre_process_images(id_, paths, **kwargs)
 
     # extract the features
     feature_extractor = FeatureExtractor(img, **kwargs)

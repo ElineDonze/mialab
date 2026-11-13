@@ -98,7 +98,8 @@ class SkullStripping(pymia_fltr.Filter):
 
         # todo: remove the skull from the image by using the brain mask
         # ED all voxels outside brain mask to 0
-        image = sitk.Mask(image, mask, outsideValue=0)  
+        # the mask is cast to an 8-bit binary image, the type sitk.Mask expects (same result, no warning)
+        image = sitk.Mask(image, sitk.Cast(mask != 0, sitk.sitkUInt8), outsideValue=0)
 
         return image
 

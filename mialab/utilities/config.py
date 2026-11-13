@@ -6,6 +6,8 @@ repeated without editing the code.
 import copy
 import tomllib
 
+import mialab.features as features
+
 DEFAULT_CONFIG = {
     'name': 'default',
     'seed': 42,
@@ -14,11 +16,10 @@ DEFAULT_CONFIG = {
         'skullstrip': True,
         'normalization': True,
     },
-    'features': {
-        'coordinates': True,
-        'intensity': True,
-        'gradient_intensity': True,
-    },
+    # one switch per feature group (see mialab/features); new groups are added automatically
+    'features': {name: group.enabled_by_default for name, group in features.GROUPS.items()},
+    # the parameters of every feature group, e.g. [feature_params.texture] radius = 2
+    'feature_params': {name: dict(group.defaults) for name, group in features.GROUPS.items()},
     'random_forest': {
         'n_estimators': 1,
         'max_depth': 5,
@@ -99,3 +100,8 @@ def random_forest_params(config: dict) -> dict:
             'max_features': max_features,
             'n_jobs': forest['n_jobs'],
             'random_state': config['seed']}
+
+
+def enabled_feature_groups(config: dict) -> list:
+    """Returns the names of the switched-on feature groups, in the column order of the feature matrix."""
+    return [name for name in features.GROUPS if config['features'][name]]
