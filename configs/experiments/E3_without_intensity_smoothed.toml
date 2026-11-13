@@ -1,0 +1,20 @@
+# E3 (ablation): all feature groups except "intensity_smoothed".
+# Settings not listed here keep the values of configs/default.toml.
+
+name = "E3_without_intensity_smoothed"
+
+[features]
+coordinates = true
+intensity = true
+gradient_intensity = true
+intensity_smoothed = false
+gradient_multiscale = true
+texture = true
+spatial = true
+glcm = true
+
+[random_forest]
+n_estimators = 100
+max_depth = "none"
+max_features = "sqrt"
+n_jobs = -1  # all cores; does not change the results
