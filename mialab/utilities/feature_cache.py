@@ -269,7 +269,7 @@ def _feature_task(cache: FeatureCache, subject_id: str, group: features.FeatureG
     images = cache.load_images(subject_id, labels=False)
     brain_idx = cache.voxels(subject_id)['brain_idx']
     shape = sitk.GetArrayFromImage(images['T1w']).shape
-    result = group.compute(images)
+    result = group.compute_for_subject(images, os.path.join(cache.root, subject_id))
     names, columns = [], []
     for name, value in result.items():
         array = sitk.GetArrayFromImage(value) if isinstance(value, sitk.Image) else np.asarray(value)

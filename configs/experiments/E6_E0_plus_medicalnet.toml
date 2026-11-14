@@ -1,0 +1,18 @@
+# E6: the baseline (7 features) plus 16 deep features of a pretrained network:
+# 3D ResNet-50 pretrained by MedicalNet (medical volumes).
+# Needs the stored features: scripts/extract_deep_features.py --network medicalnet (GPU, see ubelix/extract_deep_features.sbatch).
+# Random forest as in E0 (configs/experiments/E0_baseline.toml).
+
+name = "E6_E0_plus_medicalnet"
+
+[features]
+coordinates = true
+intensity = true
+gradient_intensity = true
+deep_medicalnet = true
+
+[random_forest]
+n_estimators = 100
+max_depth = "none"
+max_features = "sqrt"
+n_jobs = -1  # all cores; does not change the results
