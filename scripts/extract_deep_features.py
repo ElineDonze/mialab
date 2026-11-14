@@ -1,6 +1,7 @@
 """Computes the deep features of one pretrained network and stores them next to the cached images.
 
-Needs PyTorch and a GPU (see requirements-deep.txt and ubelix/extract_deep_features.sbatch). The feature groups in
+Needs PyTorch (see requirements-deep.txt and ubelix/extract_deep_features.sbatch). The networks are only applied,
+not trained, so a CPU is enough (about 15 s per subject); a GPU is faster. The feature groups in
 mialab/features/deep.py then load the stored features in the normal pipeline, without PyTorch.
 
     # training subjects: fits the PCA on them (images only, no labels) and stores the features
@@ -263,7 +264,7 @@ if __name__ == '__main__':
     parser.add_argument('--split', choices=('train', 'test'), default='train')
     parser.add_argument('--config', type=str, default=os.path.join(paths.REPO_DIR, 'configs', 'default.toml'),
                         help='Config with the pre-processing settings (selects the cache folder).')
-    parser.add_argument('--device', type=str, default='cuda')
+    parser.add_argument('--device', type=str, default='cuda', help='cuda or cpu (the last --device wins).')
     parser.add_argument('--limit', type=int, default=0, help='Only the first n subjects (for a quick test).')
     parser.add_argument('--overwrite', action='store_true', help='Recompute stored features.')
     parser.add_argument('--data_dir', type=str, default=paths.DATA_DIR)

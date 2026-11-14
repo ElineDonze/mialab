@@ -7,7 +7,7 @@
 # uv links packages from its cache, so PyTorch takes disk space only once for all environments that use the same
 # version. The pipeline itself does not need these packages.
 -r requirements.txt
-torch
-torchvision
-monai
-huggingface_hub
+torch==2.15.0  # CUDA 13 build on Linux; inference also runs on CPU (about 15 s per subject)
+torchvision==0.29.2
+monai==1.6.1
+huggingface_hub==2.4.0  # downloads the MedicalNet weights

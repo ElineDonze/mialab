@@ -6,8 +6,8 @@ Three networks with the same architecture (ResNet-50) but different pretraining 
 - ``deep_radimagenet``: 2D, radiology images (RadImageNet: CT, MRI, ultrasound)
 - ``deep_medicalnet``: 3D, medical volumes (MedicalNet, Tencent)
 
-The networks are not trained or fine-tuned; they only describe the image around each voxel. Running them needs a
-GPU and PyTorch, so it is done once by ``scripts/extract_deep_features.py`` (a separate environment, see
+The networks are not trained or fine-tuned; they only describe the image around each voxel. Running them needs
+PyTorch, so it is done once by ``scripts/extract_deep_features.py`` (a separate environment, see
 ``requirements-deep.txt``) and stored next to the cached images. The feature groups here only load the stored
 features and need no PyTorch.
 
@@ -81,7 +81,7 @@ class _DeepFeatures(FeatureGroup):
         path = stored_path(subject_dir, self.network)
         if not os.path.exists(path):
             raise FileNotFoundError(f'{path} is missing. Run scripts/extract_deep_features.py --network '
-                                    f'{self.network} first (on a GPU node, see ubelix/extract_deep_features.sbatch)')
+                                    f'{self.network} first (see ubelix/extract_deep_features.sbatch)')
         with np.load(path) as stored:
             maps = stored['maps'][:self.params['n_components']]
             shape = tuple(int(s) for s in stored['shape'])
