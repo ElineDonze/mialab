@@ -6,6 +6,7 @@
 #     sbatch ubelix/extract_deep_features.sbatch resnet_imagenet
 #     sbatch ubelix/extract_deep_features.sbatch radimagenet
 #     sbatch ubelix/extract_deep_features.sbatch medicalnet
+#     sbatch ubelix/extract_deep_features.sbatch radimagenet_3planes      # 2.5D variants: _25d and _3planes
 #     sbatch ubelix/extract_deep_features.sbatch radimagenet --split test   # only before a final test
 #
 # On a GPU node instead (free accounts: H100 or RTX4090), add --device cuda and request the GPU, e.g.
@@ -33,9 +34,9 @@ PROJECT="${MIALAB_PROJECT:-$(dirname "$REPO_DIR")}"
 export TORCH_HOME="$PROJECT/weights/torch"
 
 case "$NETWORK" in
-    resnet_imagenet) WEIGHTS="" ;;
-    radimagenet)     WEIGHTS="$PROJECT/weights/radimagenet_resnet50.pt" ;;
-    medicalnet)      WEIGHTS="$PROJECT/weights/medicalnet_resnet_50_23dataset.pth" ;;
+    resnet_imagenet*) WEIGHTS="" ;;   # also the 2.5D variants _25d and _3planes
+    radimagenet*)     WEIGHTS="$PROJECT/weights/radimagenet_resnet50.pt" ;;
+    medicalnet)       WEIGHTS="$PROJECT/weights/medicalnet_resnet_50_23dataset.pth" ;;
     *) echo "Unknown network $NETWORK"; exit 1 ;;
 esac
 

@@ -6,6 +6,9 @@ Three networks with the same architecture (ResNet-50) but different pretraining 
 - ``deep_radimagenet``: 2D, radiology images (RadImageNet: CT, MRI, ultrasound)
 - ``deep_medicalnet``: 3D, medical volumes (MedicalNet, Tencent)
 
+The two 2D networks are also used in two 2.5D variants (``_25d``: the neighbouring axial slices as the 3 colour
+channels; ``_3planes``: axial, coronal and sagittal slices, see scripts/extract_deep_features.py).
+
 The networks are not trained or fine-tuned; they only describe the image around each voxel. Running them needs
 PyTorch, so it is done once by ``scripts/extract_deep_features.py`` (a separate environment, see
 ``requirements-deep.txt``) and stored next to the cached images. The feature groups here only load the stored
@@ -40,6 +43,10 @@ NETWORKS = {
     'resnet_imagenet': (1, 2),   # 2D on axial slices: y and x
     'radimagenet': (1, 2),
     'medicalnet': (0, 1, 2),     # 3D
+    'resnet_imagenet_25d': (1, 2),         # 2.5D: neighbouring axial slices as the 3 colour channels
+    'radimagenet_25d': (1, 2),
+    'resnet_imagenet_3planes': (0, 1, 2),  # 2.5D: axial, coronal and sagittal slices, every 4th voxel
+    'radimagenet_3planes': (0, 1, 2),
 }
 
 
@@ -102,6 +109,30 @@ class RadImageNet(_DeepFeatures):
     """ResNet-50 pretrained on RadImageNet (radiology images), applied to axial slices."""
     name = 'deep_radimagenet'
     network = 'radimagenet'
+
+
+class ResNetImageNet25D(_DeepFeatures):
+    """ResNet-50 (ImageNet) on axial slices, with the neighbouring slices as colour channels (2.5D)."""
+    name = 'deep_resnet_imagenet_25d'
+    network = 'resnet_imagenet_25d'
+
+
+class RadImageNet25D(_DeepFeatures):
+    """ResNet-50 (RadImageNet) on axial slices, with the neighbouring slices as colour channels (2.5D)."""
+    name = 'deep_radimagenet_25d'
+    network = 'radimagenet_25d'
+
+
+class ResNetImageNet3Planes(_DeepFeatures):
+    """ResNet-50 (ImageNet) on axial, coronal and sagittal slices (2.5D)."""
+    name = 'deep_resnet_imagenet_3planes'
+    network = 'resnet_imagenet_3planes'
+
+
+class RadImageNet3Planes(_DeepFeatures):
+    """ResNet-50 (RadImageNet) on axial, coronal and sagittal slices (2.5D)."""
+    name = 'deep_radimagenet_3planes'
+    network = 'radimagenet_3planes'
 
 
 class MedicalNet(_DeepFeatures):

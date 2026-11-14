@@ -15,7 +15,8 @@ What is computed (one network, one subject):
    (grey value copied to the 3 colour channels, ImageNet normalization); the 3D network sees the whole volume
    (z-score inside the brain, as in MedicalNet).
 2. Hypercolumns: the outputs of layer1 (stride 4) and layer2 (stride 8, linearly upsampled to stride 4) are
-   concatenated, for T1w and T2w: 2 x (256 + 512) = 1536 channels at every 4th voxel.
+   concatenated, for T1w and T2w: 2 x (256 + 512) = 1536 channels at every 4th voxel (x 3 for the three slice
+   directions of the "_3planes" networks; "_25d" networks see the neighbouring slices, see hypercolumns()).
 3. The channels are standardized and reduced to 16 with PCA. The PCA is fitted once, on randomly chosen brain
    positions of the 20 training subjects, and stored in the cache; the test subjects are only projected.
 4. The 16 maps are stored as float16 at stride 4. Grid value i lies at voxel 4 * i: the images are padded at the
@@ -141,28 +142,62 @@ def upsample_layer2(layer2: torch.Tensor, size: tuple) -> torch.Tensor:
 
 # ----- hypercolumns -----
 
+def backbone_and_view(network: str) -> tuple:
+    """'radimagenet_3planes' -> ('radimagenet', '3planes'); views: axial, 25d, 3planes (2D networks) or 3d."""
+    for view in ('25d', '3planes'):
+        if network.endswith('_' + view):
+            return network[:-len(view) - 1], view
+    return network, '3d' if network == 'medicalnet' else 'axial'
+
+
+def run_2d(forward, slices: torch.Tensor, device: str) -> torch.Tensor:
+    """2D network on slices (n, 3, h, w) scaled to 0..1: layer1 + upsampled layer2, (768, n, h / 4, w / 4)."""
+    mean = torch.tensor(IMAGENET_MEAN, device=device).view(1, 3, 1, 1)
+    std = torch.tensor(IMAGENET_STD, device=device).view(1, 3, 1, 1)
+    parts = []
+    for start in range(0, len(slices), SLICES_PER_BATCH):
+        batch = slices[start:start + SLICES_PER_BATCH].to(device)
+        layer1, layer2 = forward((batch - mean) / std)
+        parts.append(torch.cat([layer1, upsample_layer2(layer2, layer1.shape[2:])], 1).half().cpu())
+    return torch.cat(parts).permute(1, 0, 2, 3)
+
+
 @torch.inference_mode()
 def hypercolumns(forward, network: str, images: dict, device: str) -> np.ndarray:
-    """Layer1 + layer2 outputs of T1w and T2w on the stride-4 grid: array (1536, *grid), float16."""
+    """Layer1 + layer2 outputs of T1w and T2w on the stored grid (float16, channels first).
+
+    Views of the 2D networks:
+
+    - axial: every axial slice, its grey value copied to the 3 colour channels (1536 channels).
+    - 25d: every axial slice, with the slice below, the slice itself and the slice above as the 3 colour channels,
+      so the network sees a little depth (1536 channels).
+    - 3planes: axial, coronal and sagittal slices at every 4th voxel (grey value copied to the 3 channels); the
+      outputs of the three directions are concatenated on a stride-4 grid in all axes (4608 channels).
+    """
     mask = sitk.GetArrayFromImage(images['BrainMask']) > 0
-    axes = deep.NETWORKS[network]
+    _, view = backbone_and_view(network)
     columns = []
     for modality in ('T1w', 'T2w'):
         volume = sitk.GetArrayFromImage(images[modality]).astype(np.float32)
-        if network == 'medicalnet':
-            x = torch.from_numpy(pad_end(scale_3d(volume, mask), axes))[None, None].to(device)
+        if view == '3d':
+            x = torch.from_numpy(pad_end(scale_3d(volume, mask), (0, 1, 2)))[None, None].to(device)
             layer1, layer2 = forward(x)
             columns.append(torch.cat([layer1, upsample_layer2(layer2, layer1.shape[2:])], 1)[0].half().cpu())
-        else:
+        elif view in ('axial', '25d'):
             slices = torch.from_numpy(pad_end(scale_2d(volume, mask), (1, 2)))
-            mean = torch.tensor(IMAGENET_MEAN, device=device).view(1, 3, 1, 1)
-            std = torch.tensor(IMAGENET_STD, device=device).view(1, 3, 1, 1)
-            parts = []
-            for start in range(0, len(slices), SLICES_PER_BATCH):
-                batch = slices[start:start + SLICES_PER_BATCH, None].to(device).expand(-1, 3, -1, -1)
-                layer1, layer2 = forward((batch - mean) / std)
-                parts.append(torch.cat([layer1, upsample_layer2(layer2, layer1.shape[2:])], 1).half().cpu())
-            columns.append(torch.cat(parts).permute(1, 0, 2, 3))  # (channels, z, y, x)
+            if view == 'axial':
+                rgb = slices[:, None].expand(-1, 3, -1, -1)
+            else:  # neighbours below and above; the first and last slice repeat themselves
+                below = torch.cat([slices[:1], slices[:-1]])
+                above = torch.cat([slices[1:], slices[-1:]])
+                rgb = torch.stack([below, slices, above], 1)
+            columns.append(run_2d(forward, rgb, device))  # (channels, z, y, x)
+        else:  # 3planes
+            padded = pad_end(scale_2d(volume, mask), (0, 1, 2))
+            for axis in range(3):
+                planes = torch.from_numpy(np.ascontiguousarray(np.moveaxis(padded, axis, 0)[::deep.STRIDE]))
+                out = run_2d(forward, planes[:, None].expand(-1, 3, -1, -1), device)
+                columns.append(out.movedim(1, axis + 1))  # back to (channels, z, y, x) on the stride-4 grid
     return torch.cat(columns).numpy()
 
 
@@ -218,11 +253,11 @@ def main(args):
     cache.ensure_preprocessed(cache.subject_ids)
     pca_path = os.path.join(args.cache_dir, cache.prep_key,
                             f'deep_{args.network}_v{deep.EXTRACTION_VERSION}_pca.npz')
-    if args.network != 'resnet_imagenet' and not (args.weights and os.path.isfile(args.weights)):
+    if not args.network.startswith('resnet_imagenet') and not (args.weights and os.path.isfile(args.weights)):
         raise FileNotFoundError(f'--weights must point to the downloaded {args.network} weights')
     if args.device == 'cuda' and not torch.cuda.is_available():
         raise RuntimeError('No GPU found; run this script on a GPU node (or pass --device cpu for a small test)')
-    forward = load_network(args.network, args.weights)
+    forward = load_network(backbone_and_view(args.network)[0], args.weights)
     start = timeit.default_timer()
 
     if not os.path.exists(pca_path):

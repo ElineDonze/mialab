@@ -1,6 +1,6 @@
 # E6: all hand-crafted feature groups (79 features, as E3_all) plus 16 deep features of a pretrained network:
 # 3D ResNet-50 pretrained by MedicalNet (medical volumes).
-# Needs the stored features: scripts/extract_deep_features.py --network medicalnet (GPU, see ubelix/extract_deep_features.sbatch).
+# Needs the stored features: scripts/extract_deep_features.py --network medicalnet (see ubelix/extract_deep_features.sbatch).
 
 name = "E6_all_plus_medicalnet"
 

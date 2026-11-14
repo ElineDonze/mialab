@@ -115,6 +115,10 @@ GROUPS = {group.name: group for group in [
     deep.ResNetImageNet,              # 16 features, pretrained 2D network (natural photos)
     deep.RadImageNet,                 # 16 features, pretrained 2D network (radiology images)
     deep.MedicalNet,                  # 16 features, pretrained 3D network (medical volumes)
+    deep.ResNetImageNet25D,           # 16 features each: 2.5D variants of the two 2D networks
+    deep.RadImageNet25D,
+    deep.ResNetImageNet3Planes,
+    deep.RadImageNet3Planes,
 ]}
 
 
