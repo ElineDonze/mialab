@@ -1,0 +1,12 @@
+# Correlation map of the PyRadiomics GLCM features only (10 features x T1w/T2w = 20 features).
+# Used by analysis/correlation_map.py, not by pipeline.py.
+#
+#     python analysis/correlation_map.py --config configs/analysis/corr_glcm.toml
+
+name = "glcm_only"
+
+[features]
+coordinates = false
+intensity = false
+gradient_intensity = false
+glcm = true
