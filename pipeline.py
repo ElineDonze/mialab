@@ -33,6 +33,7 @@ try:
     import mialab.features as features
     import mialab.utilities.config as cfg
     import mialab.utilities.feature_cache as fcache
+    import mialab.utilities.feature_selection as fsel
     import mialab.utilities.paths as paths
     import mialab.utilities.pipeline_utilities as putil
     import mialab.utilities.run_log as run_log
@@ -42,6 +43,7 @@ except ImportError:
     import mialab.features as features
     import mialab.utilities.config as cfg
     import mialab.utilities.feature_cache as fcache
+    import mialab.utilities.feature_selection as fsel
     import mialab.utilities.paths as paths
     import mialab.utilities.pipeline_utilities as putil
     import mialab.utilities.run_log as run_log
@@ -76,6 +78,11 @@ def train_and_evaluate(config: dict, groups: list, train_cache: fcache.FeatureCa
         eval_cache.ensure_features(group, eval_ids, fit_cache=train_cache, fit_ids=train_ids)
 
     data, labels, _, names = train_cache.matrix(train_ids, groups, 'sample', fit_ids=train_ids)
+    columns = slice(None)
+    if fsel.is_active(config):
+        columns, selection_rows = fsel.select(config, data, labels, names)
+        run.write_csv(f'feature_selection_fold{fold}.csv', selection_rows)
+        data, names = data[:, columns], [names[c] for c in columns]
     print('-' * 5, f'Fold {fold}: training on {len(train_ids)} subjects, {len(labels)} voxels, '
           f'{len(names)} features', flush=True)
     forest = sk_ensemble.RandomForestClassifier(**cfg.random_forest_params(config))
@@ -89,6 +96,7 @@ def train_and_evaluate(config: dict, groups: list, train_cache: fcache.FeatureCa
     os.makedirs(segmentation_dir, exist_ok=True)
     for subject in eval_ids:
         data, _, _, _ = eval_cache.matrix([subject], groups, 'brain', fit_ids=train_ids)
+        data = data[:, columns]
         predictions = forest.predict(data).astype(np.uint8)
 
         # voxels outside the brain mask are background
