@@ -1,0 +1,23 @@
+# E6: all hand-crafted feature groups (79 features, as E3_all) plus 16 deep features of a pretrained network:
+# ResNet-50 pretrained on ImageNet (natural photos), 2D.
+# Variant: 2.5D: axial, coronal and sagittal slices.
+# Needs the stored features: scripts/extract_deep_features.py --network resnet_imagenet_3planes (see ubelix/extract_deep_features.sbatch).
+
+name = "E6_all_plus_resnet_imagenet_3planes"
+
+[features]
+coordinates = true
+intensity = true
+gradient_intensity = true
+intensity_smoothed = true
+gradient_multiscale = true
+texture = true
+spatial = true
+glcm = true
+deep_resnet_imagenet_3planes = true
+
+[random_forest]
+n_estimators = 100
+max_depth = "none"
+max_features = "sqrt"
+n_jobs = -1  # all cores; does not change the results

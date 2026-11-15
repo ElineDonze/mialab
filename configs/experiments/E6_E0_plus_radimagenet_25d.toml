@@ -1,0 +1,19 @@
+# E6: the baseline (7 features) plus 16 deep features of a pretrained network:
+# ResNet-50 pretrained on RadImageNet (radiology images), 2D.
+# Variant: 2.5D: the neighbouring axial slices as the 3 colour channels.
+# Needs the stored features: scripts/extract_deep_features.py --network radimagenet_25d (see ubelix/extract_deep_features.sbatch).
+# Random forest as in E0 (configs/experiments/E0_baseline.toml).
+
+name = "E6_E0_plus_radimagenet_25d"
+
+[features]
+coordinates = true
+intensity = true
+gradient_intensity = true
+deep_radimagenet_25d = true
+
+[random_forest]
+n_estimators = 100
+max_depth = "none"
+max_features = "sqrt"
+n_jobs = -1  # all cores; does not change the results
