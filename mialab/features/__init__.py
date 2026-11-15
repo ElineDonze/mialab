@@ -119,6 +119,7 @@ GROUPS = {group.name: group for group in [
     deep.RadImageNet25D,
     deep.ResNetImageNet3Planes,
     deep.RadImageNet3Planes,
+    deep.AutoEncoder,                 # 16 features, 3D autoencoder trained on the training subjects
 ]}
 
 

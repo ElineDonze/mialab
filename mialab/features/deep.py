@@ -24,6 +24,9 @@ How the stored features are made (see the script for details):
 4. The 16 maps are stored at stride 4 (value i at voxel 4 * i) and upsampled to the image grid here (linear
    interpolation).
 
+``deep_autoencoder`` is different: a small 3D autoencoder trained on our 20 training subjects
+(scripts/train_autoencoder.py); its 16 bottleneck maps are stored in the same way (stride 4 in all axes, no PCA).
+
 No labels are used anywhere, so the groups are not fold dependent.
 """
 import os
@@ -47,6 +50,7 @@ NETWORKS = {
     'radimagenet_25d': (1, 2),
     'resnet_imagenet_3planes': (0, 1, 2),  # 2.5D: axial, coronal and sagittal slices, every 4th voxel
     'radimagenet_3planes': (0, 1, 2),
+    'autoencoder': (0, 1, 2),    # 3D autoencoder trained on our training subjects (scripts/train_autoencoder.py)
 }
 
 
@@ -139,3 +143,12 @@ class MedicalNet(_DeepFeatures):
     """3D ResNet-50 pretrained by MedicalNet on 23 medical datasets."""
     name = 'deep_medicalnet'
     network = 'medicalnet'
+
+
+class AutoEncoder(_DeepFeatures):
+    """Bottleneck of a small 3D autoencoder trained on the training subjects (images only, no labels).
+
+    Not pretrained elsewhere: scripts/train_autoencoder.py trains it and stores its 16 bottleneck maps (no PCA).
+    """
+    name = 'deep_autoencoder'
+    network = 'autoencoder'
