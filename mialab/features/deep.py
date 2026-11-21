@@ -52,6 +52,11 @@ NETWORKS = {
     'radimagenet_3planes': (0, 1, 2),
     'autoencoder': (0, 1, 2),    # 3D autoencoder trained on our training subjects (scripts/train_autoencoder.py)
     'unet': (),                  # supervised 3D U-Net, stored at full resolution (scripts/train_unet_features.py)
+    # layer comparison: one layer of the ImageNet ResNet-50 on axial slices instead of layer1 + layer2
+    'resnet_imagenet_layer1': (1, 2),
+    'resnet_imagenet_layer2': (1, 2),
+    'resnet_imagenet_layer3': (1, 2),
+    'resnet_imagenet_layer4': (1, 2),
 }
 
 
@@ -155,6 +160,34 @@ class AutoEncoder(_DeepFeatures):
     """
     name = 'deep_autoencoder'
     network = 'autoencoder'
+
+
+class _ResNetImageNetLayer(_DeepFeatures):
+    """One layer of the ImageNet ResNet-50 on axial slices (layer comparison), PCA to 16 at the layer's stride."""
+
+
+class ResNetImageNetLayer1(_ResNetImageNetLayer):
+    """Layer1 only (stride 4, 2 x 256 channels)."""
+    name = 'deep_resnet_imagenet_layer1'
+    network = 'resnet_imagenet_layer1'
+
+
+class ResNetImageNetLayer2(_ResNetImageNetLayer):
+    """Layer2 only (stride 8, 2 x 512 channels)."""
+    name = 'deep_resnet_imagenet_layer2'
+    network = 'resnet_imagenet_layer2'
+
+
+class ResNetImageNetLayer3(_ResNetImageNetLayer):
+    """Layer3 only (stride 16, 2 x 1024 channels)."""
+    name = 'deep_resnet_imagenet_layer3'
+    network = 'resnet_imagenet_layer3'
+
+
+class ResNetImageNetLayer4(_ResNetImageNetLayer):
+    """Layer4 only (stride 32, 2 x 2048 channels)."""
+    name = 'deep_resnet_imagenet_layer4'
+    network = 'resnet_imagenet_layer4'
 
 
 class UNet(_DeepFeatures):

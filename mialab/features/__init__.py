@@ -121,6 +121,10 @@ GROUPS = {group.name: group for group in [
     deep.RadImageNet3Planes,
     deep.AutoEncoder,                 # 16 features, 3D autoencoder trained on the training subjects
     deep.UNet,                        # 16 features, supervised 3D U-Net (out-of-fold models)
+    deep.ResNetImageNetLayer1,        # 16 features each: one ImageNet ResNet-50 layer (layer comparison)
+    deep.ResNetImageNetLayer2,
+    deep.ResNetImageNetLayer3,
+    deep.ResNetImageNetLayer4,
 ]}
 
 
