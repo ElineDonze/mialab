@@ -1,0 +1,19 @@
+# E10: the 3 coordinates and the 16 learned features, no other hand-crafted features:
+# a small 3D autoencoder trained on the 20 training subjects (images only, no labels).
+# Shows what the learned features know on their own.
+# Needs the stored features: scripts/train_autoencoder.py.
+# Random forest as in E0 (configs/experiments/E0_baseline.toml).
+
+name = "E10_coords_autoencoder"
+
+[features]
+coordinates = true
+intensity = false
+gradient_intensity = false
+deep_autoencoder = true
+
+[random_forest]
+n_estimators = 100
+max_depth = "none"
+max_features = "sqrt"
+n_jobs = -1  # all cores; does not change the results

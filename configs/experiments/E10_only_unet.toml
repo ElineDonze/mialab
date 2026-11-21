@@ -1,0 +1,19 @@
+# E10: only the 16 learned features, no hand-crafted features:
+# the last decoder layer of a small supervised 3D U-Net (out-of-fold models).
+# Shows what the learned features know on their own.
+# Needs the stored features: scripts/train_unet_features.py.
+# Random forest as in E0 (configs/experiments/E0_baseline.toml).
+
+name = "E10_only_unet"
+
+[features]
+coordinates = false
+intensity = false
+gradient_intensity = false
+deep_unet = true
+
+[random_forest]
+n_estimators = 100
+max_depth = "none"
+max_features = "sqrt"
+n_jobs = -1  # all cores; does not change the results
