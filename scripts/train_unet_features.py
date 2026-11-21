@@ -156,7 +156,7 @@ def train(train_cache, train_ids, args, model_path: str):
     step, history, seconds = 0, [], 0.0
     ckpt_path = model_path + '.ckpt'
     if os.path.exists(ckpt_path):
-        ckpt = torch.load(ckpt_path, map_location=args.device, weights_only=False)
+        ckpt = torch.load(ckpt_path, map_location='cpu', weights_only=False)  # the RNG state must stay on CPU
         model.load_state_dict(ckpt['model'])
         optimizer.load_state_dict(ckpt['optimizer'])
         scheduler.load_state_dict(ckpt['scheduler'])

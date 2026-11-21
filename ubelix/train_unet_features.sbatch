@@ -20,6 +20,7 @@
 #SBATCH --mem=48G
 #SBATCH --time=08:00:00
 #SBATCH --requeue
+#SBATCH --open-mode=append
 #SBATCH --output=../logs/%x_%j.out
 
 set -euo pipefail
