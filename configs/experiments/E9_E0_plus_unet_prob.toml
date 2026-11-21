@@ -1,0 +1,18 @@
+# E9: the baseline (7 features) plus 6 tissue probabilities of a supervised U-Net (stacking):
+# the softmax output of a small 3D U-Net (DynUNet), from out-of-fold models (no subject sees its own labels).
+# Needs the stored features: scripts/train_unet_features.py (see ubelix/train_unet_features.sbatch).
+# Random forest as in E0 (configs/experiments/E0_baseline.toml).
+
+name = "E9_E0_plus_unet_prob"
+
+[features]
+coordinates = true
+intensity = true
+gradient_intensity = true
+deep_unet_prob = true
+
+[random_forest]
+n_estimators = 100
+max_depth = "none"
+max_features = "sqrt"
+n_jobs = -1  # all cores; does not change the results

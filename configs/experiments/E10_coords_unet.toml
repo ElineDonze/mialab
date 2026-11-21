@@ -1,5 +1,7 @@
 # E10: the 3 coordinates and the 16 learned features, no other hand-crafted features:
 # the last decoder layer of a small supervised 3D U-Net (out-of-fold models).
+# Not valid for stacking (kept to document it): the hidden channels differ between the out-of-fold U-Nets;
+# see mialab/features/deep.py (UNet). The valid variant is E10_coords_unet_prob.
 # Shows what the learned features know on their own.
 # Needs the stored features: scripts/train_unet_features.py.
 # Random forest as in E0 (configs/experiments/E0_baseline.toml).

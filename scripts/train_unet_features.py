@@ -1,4 +1,4 @@
-"""Trains a small supervised 3D U-Net and stores its last decoder layer as 16 learned features per voxel (E9).
+"""Trains a small supervised 3D U-Net and stores its outputs as learned features per voxel (E9).
 
 Unlike the pretrained networks (E6) and the autoencoder (E7), the U-Net is trained with the labels. So a subject
 must never get features from a U-Net that was trained on its own labels. This is done with out-of-fold models
@@ -25,8 +25,12 @@ Details:
   tissue label (1-5), so the small structures are seen often. Augmentation: left-right flip and a small
   intensity scale and shift.
 - Network: MONAI DynUNet (the nnU-Net architecture), filters 16/32/64/128, instance norm, deep supervision.
-- Features: the input of the output layer, i.e. the last decoder layer (16 channels at full resolution), from
-  sliding-window inference with the same 96^3 blocks. The final probabilities are not stored as features.
+- Stored per subject, from sliding-window inference with the same 96^3 blocks, at full resolution:
+  ``unet``: the input of the output layer, i.e. the last decoder layer (16 channels), and
+  ``unet_prob``: the 6 softmax probabilities (background + 5 tissues).
+- Only ``unet_prob`` is valid for stacking: the 16 hidden channels mean something different in every U-Net (each
+  training run finds its own arbitrary channel order), so a random forest trained on the hidden channels of some
+  out-of-fold models can not read those of another model. The probabilities mean the same in every model.
 - The model is saved every ``--ckpt_every`` steps, so a preempted job continues where it stopped.
 """
 import argparse
@@ -51,7 +55,8 @@ import mialab.utilities.feature_cache as fcache  # noqa: E402
 import mialab.utilities.paths as paths  # noqa: E402
 from extract_deep_features import scale_3d  # noqa: E402
 
-NETWORK = 'unet'
+NETWORK = 'unet'            # 16 channels of the last decoder layer
+NETWORK_PROB = 'unet_prob'  # the 6 softmax probabilities (background + 5 tissues)
 N_LABELS = 6
 FILTERS = (16, 32, 64, 128)
 SUPERVISION_WEIGHTS = (1.0, 0.5, 0.25)  # main output, then the two deep supervision heads
@@ -210,7 +215,9 @@ def predict(net: FeaturesAndLogits, volume: np.ndarray, args) -> tuple:
         out = sliding_window_inference(x, (args.patch,) * 3, sw_batch_size=2, predictor=net, overlap=0.5,
                                        mode='gaussian')
     out = out[0].float()
-    return out[:deep.N_COMPONENTS].half().cpu().numpy(), out[deep.N_COMPONENTS:].argmax(0).cpu().numpy()
+    logits = out[deep.N_COMPONENTS:]
+    return (out[:deep.N_COMPONENTS].half().cpu().numpy(), torch.softmax(logits, 0).half().cpu().numpy(),
+            logits.argmax(0).cpu().numpy())
 
 
 def main(args):
@@ -260,11 +267,12 @@ def main(args):
     dice = {}
     for cache, subject, has_labels in targets:
         path = deep.stored_path(os.path.join(cache.root, subject), NETWORK)
-        if os.path.exists(path) and not args.overwrite and not args.smoke:
+        prob_path = deep.stored_path(os.path.join(cache.root, subject), NETWORK_PROB)
+        if os.path.exists(path) and os.path.exists(prob_path) and not args.overwrite and not args.smoke:
             continue
         volume, _, label = load_subject(cache, subject, labels=has_labels)
         t0 = timeit.default_timer()
-        maps, prediction = predict(net, volume, args)
+        maps, probabilities, prediction = predict(net, volume, args)
         if has_labels:  # only held-out training subjects; the test labels are never read here
             dice[subject] = dice_per_label(prediction, label)
         print(f'  {subject}: features {maps.shape}, {timeit.default_timer() - t0:.0f} s'
@@ -272,10 +280,11 @@ def main(args):
         if args.smoke:
             continue
         os.makedirs(os.path.dirname(path), exist_ok=True)
-        tmp = path + f'.tmp{os.getpid()}.npz'
-        np.savez(tmp, maps=maps, shape=np.array(volume.shape[1:]), network=NETWORK,
-                 fit_subjects=np.array(saved['fit_subjects']))
-        os.replace(tmp, path)
+        for file, values, network in ((path, maps, NETWORK), (prob_path, probabilities, NETWORK_PROB)):
+            tmp = file + f'.tmp{os.getpid()}.npz'
+            np.savez(tmp, maps=values, shape=np.array(volume.shape[1:]), network=network,
+                     fit_subjects=np.array(saved['fit_subjects']))
+            os.replace(tmp, file)
 
     info = {'network': NETWORK, 'fold': args.fold, 'fit_subjects': len(train_ids), 'model_file': model_path,
             'settings': saved['settings'], 'train_seconds': round(saved['seconds']),

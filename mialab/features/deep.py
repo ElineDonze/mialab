@@ -52,6 +52,7 @@ NETWORKS = {
     'radimagenet_3planes': (0, 1, 2),
     'autoencoder': (0, 1, 2),    # 3D autoencoder trained on our training subjects (scripts/train_autoencoder.py)
     'unet': (),                  # supervised 3D U-Net, stored at full resolution (scripts/train_unet_features.py)
+    'unet_prob': (),             # its 6 softmax probabilities, full resolution
     # layer comparison: one layer of the ImageNet ResNet-50 on axial slices instead of layer1 + layer2
     'resnet_imagenet_layer1': (1, 2),
     'resnet_imagenet_layer2': (1, 2),
@@ -198,6 +199,26 @@ class UNet(_DeepFeatures):
     all 20 training subjects (scripts/train_unet_features.py). For the pipeline the group is therefore not fold
     dependent. Limitation: the CV results are slightly optimistic, because the U-Nets that made the features of
     the random forest's training subjects saw the labels of the validation fold. The test results are clean.
+
+    Not valid for stacking (kept to document this): the 16 hidden channels mean something different in every
+    U-Net, so the random forest is trained on channels of some models and applied to those of another one.
+    Use ``deep_unet_prob`` instead.
     """
     name = 'deep_unet'
     network = 'unet'
+
+
+class UNetProb(_DeepFeatures):
+    """The 6 softmax probabilities of the out-of-fold U-Nets (background + 5 tissues); see :class:`UNet`.
+
+    Unlike the hidden channels, the probabilities mean the same in every U-Net, so this is the valid stacking
+    variant (as in auto-context: the random forest gets the first model's tissue probabilities as features).
+    """
+    name = 'deep_unet_prob'
+    network = 'unet_prob'
+    defaults = {'n_components': 6}
+    LABELS = ('background', 'white_matter', 'grey_matter', 'hippocampus', 'amygdala', 'thalamus')
+
+    def compute_for_subject(self, images, subject_dir):
+        maps = super().compute_for_subject(images, subject_dir)
+        return {f'p_{label}': value for label, value in zip(self.LABELS, maps.values())}

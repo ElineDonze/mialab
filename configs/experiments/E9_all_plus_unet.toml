@@ -1,5 +1,7 @@
 # E9: all hand-crafted feature groups (79 features, as E3_all) plus 16 learned features of a supervised U-Net:
 # the last decoder layer of a small 3D U-Net (DynUNet), from out-of-fold models (no subject sees its own labels).
+# Not valid for stacking (kept to document it): the hidden channels differ between the out-of-fold U-Nets;
+# see mialab/features/deep.py (UNet). The valid variant is E9_all_plus_unet_prob.
 # Needs the stored features: scripts/train_unet_features.py (see ubelix/train_unet_features.sbatch).
 
 name = "E9_all_plus_unet"
