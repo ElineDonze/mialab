@@ -189,6 +189,10 @@ def run_experiment(config: dict, mode: str = 'cv', config_file: str = '', data_d
     groups = [features.create(name, config['feature_params'][name]) for name in cfg.enabled_feature_groups(config)]
     if not groups:
         raise ValueError('No feature group is switched on in the config')
+    test_only = [g.name for g in groups if getattr(g, 'final_test_only', False)]
+    if test_only and mode != 'final_test':
+        raise ValueError(f'{", ".join(test_only)} saw the labels of the training subjects; use it with --final-test '
+                         'only (a cross-validation would leak the labels of the validation fold)')
     train_cache = fcache.FeatureCache(config, 'train', data_dir, cache_dir, workers)
 
     run = run_log.Run(config, mode, runs_dir, outputs_dir, config_file)

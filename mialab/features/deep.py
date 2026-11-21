@@ -53,6 +53,7 @@ NETWORKS = {
     'autoencoder': (0, 1, 2),    # 3D autoencoder trained on our training subjects (scripts/train_autoencoder.py)
     'unet': (),                  # supervised 3D U-Net, stored at full resolution (scripts/train_unet_features.py)
     'unet_prob': (),             # its 6 softmax probabilities, full resolution
+    'unet_single': (),           # hidden layer of ONE U-Net trained on all 20 training subjects (final test only)
     # layer comparison: one layer of the ImageNet ResNet-50 on axial slices instead of layer1 + layer2
     'resnet_imagenet_layer1': (1, 2),
     'resnet_imagenet_layer2': (1, 2),
@@ -206,6 +207,19 @@ class UNet(_DeepFeatures):
     """
     name = 'deep_unet'
     network = 'unet'
+
+
+class UNetSingle(_DeepFeatures):
+    """Last decoder layer (16 channels) of ONE U-Net, trained on all 20 training subjects, for every subject.
+
+    One model for all subjects, so the channels mean the same everywhere (unlike :class:`UNet`). The U-Net saw
+    the labels of the training subjects, so their features are a bit better than those of unseen subjects (Dice
+    0.88 vs 0.85, mostly in the small structures). A cross-validation on these features would leak the labels of
+    the validation fold, so the group is used with ``pipeline.py --final-test`` only.
+    """
+    name = 'deep_unet_single'
+    network = 'unet_single'
+    final_test_only = True  # pipeline.py refuses a cross-validation with this group
 
 
 class UNetProb(_DeepFeatures):

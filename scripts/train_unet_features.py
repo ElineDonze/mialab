@@ -16,6 +16,12 @@ numbers are clean.
     python scripts/train_unet_features.py --fold 0
     python scripts/train_unet_features.py --fold all --predict_test   # only before a final test
     python scripts/train_unet_features.py --fold 0 --steps 200 --smoke  # timing test, stores nothing in the cache
+    python scripts/train_unet_features.py --fold all --single   # one model for all subjects (final test only)
+
+``--single`` (with ``--fold all``): the hidden layer of the one U-Net trained on all 20 training subjects is stored
+as ``unet_single`` for all 20 training and all 10 test subjects. One model, so the channels mean the same for
+every subject. The training subjects were seen by this U-Net, so use these features with
+``pipeline.py --final-test`` only (no cross-validation). The out-of-fold files are not touched.
 
 Details:
 
@@ -57,6 +63,7 @@ from extract_deep_features import scale_3d  # noqa: E402
 
 NETWORK = 'unet'            # 16 channels of the last decoder layer
 NETWORK_PROB = 'unet_prob'  # the 6 softmax probabilities (background + 5 tissues)
+NETWORK_SINGLE = 'unet_single'  # hidden layer of the one model on all training subjects, for every subject
 N_LABELS = 6
 FILTERS = (16, 32, 64, 128)
 SUPERVISION_WEIGHTS = (1.0, 0.5, 0.25)  # main output, then the two deep supervision heads
@@ -228,6 +235,8 @@ def main(args):
         raise ValueError('--smoke needs a separate --out_dir, so the real model folder never gets a test model')
     if args.predict_test and args.fold != 'all':
         raise ValueError('--predict_test needs --fold all (the U-Net trained on all training subjects)')
+    if args.single and (args.fold != 'all' or args.predict_test or args.smoke):
+        raise ValueError('--single needs --fold all and can not be combined with --predict_test or --smoke')
     with open(os.path.join(paths.REPO_DIR, 'configs', 'folds.json')) as f:
         folds = json.load(f)['folds']
 
@@ -256,8 +265,8 @@ def main(args):
     model.eval()
     net = FeaturesAndLogits(model)
 
-    targets = [(train_cache, s, True) for s in held_out]
-    if args.predict_test:
+    targets = [(train_cache, s, True) for s in (all_train if args.single else held_out)]
+    if args.predict_test or args.single:
         test_cache = fcache.FeatureCache(config, 'test', args.data_dir, args.cache_dir)
         test_cache.ensure_preprocessed(test_cache.subject_ids)
         targets += [(test_cache, s, False) for s in test_cache.subject_ids]
@@ -265,36 +274,45 @@ def main(args):
         targets = targets[:1]
 
     dice = {}
+    dice_kind = 'seen' if args.single else 'held-out'  # --single: the model was trained on these subjects
     for cache, subject, has_labels in targets:
-        path = deep.stored_path(os.path.join(cache.root, subject), NETWORK)
-        prob_path = deep.stored_path(os.path.join(cache.root, subject), NETWORK_PROB)
-        if os.path.exists(path) and os.path.exists(prob_path) and not args.overwrite and not args.smoke:
+        subject_dir = os.path.join(cache.root, subject)
+        if args.single:
+            outputs = [(deep.stored_path(subject_dir, NETWORK_SINGLE), 0, NETWORK_SINGLE)]
+        else:
+            outputs = [(deep.stored_path(subject_dir, NETWORK), 0, NETWORK),
+                       (deep.stored_path(subject_dir, NETWORK_PROB), 1, NETWORK_PROB)]
+        if all(os.path.exists(p) for p, _, _ in outputs) and not args.overwrite and not args.smoke:
             continue
         volume, _, label = load_subject(cache, subject, labels=has_labels)
         t0 = timeit.default_timer()
         maps, probabilities, prediction = predict(net, volume, args)
-        if has_labels:  # only held-out training subjects; the test labels are never read here
+        if has_labels:  # only training subjects; the test labels are never read here
             dice[subject] = dice_per_label(prediction, label)
         print(f'  {subject}: features {maps.shape}, {timeit.default_timer() - t0:.0f} s'
-              + (f', held-out Dice {dice[subject]}' if has_labels else ''), flush=True)
+              + (f', {dice_kind} Dice {dice[subject]}' if has_labels else ''), flush=True)
         if args.smoke:
             continue
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        for file, values, network in ((path, maps, NETWORK), (prob_path, probabilities, NETWORK_PROB)):
+        os.makedirs(os.path.dirname(outputs[0][0]), exist_ok=True)
+        for file, which, network in outputs:
+            values = (maps, probabilities)[which]
             tmp = file + f'.tmp{os.getpid()}.npz'
             np.savez(tmp, maps=values, shape=np.array(volume.shape[1:]), network=network,
                      fit_subjects=np.array(saved['fit_subjects']))
             os.replace(tmp, file)
 
-    info = {'network': NETWORK, 'fold': args.fold, 'fit_subjects': len(train_ids), 'model_file': model_path,
+    key = dice_kind.replace('-', '_')
+    info = {'network': NETWORK_SINGLE if args.single else NETWORK, 'fold': args.fold,
+            'fit_subjects': len(train_ids), 'model_file': model_path,
             'settings': saved['settings'], 'train_seconds': round(saved['seconds']),
-            'last_loss': saved['history'][-1] if saved['history'] else None, 'held_out_dice': dice,
+            'last_loss': saved['history'][-1] if saved['history'] else None, f'{key}_dice': dice,
             'device': torch.cuda.get_device_name() if args.device == 'cuda' else 'cpu',
             'seconds': round(timeit.default_timer() - start)}
     if dice:
-        info['held_out_mean_dice'] = {k: round(float(np.mean([d[k] for d in dice.values()])), 4)
-                                      for k in range(1, N_LABELS)}
-    with open(os.path.join(model_dir, f'fold{args.fold}_info.json'), 'w') as f:
+        info[f'{key}_mean_dice'] = {k: round(float(np.mean([d[k] for d in dice.values()])), 4)
+                                    for k in range(1, N_LABELS)}
+    info_name = f'fold{args.fold}_single_info.json' if args.single else f'fold{args.fold}_info.json'
+    with open(os.path.join(model_dir, info_name), 'w') as f:
         json.dump(info, f, indent=2)
     print(json.dumps(info, indent=2))
 
@@ -304,6 +322,9 @@ if __name__ == '__main__':
     parser.add_argument('--fold', choices=('0', '1', '2', '3', '4', 'all'), required=True)
     parser.add_argument('--predict_test', action='store_true',
                         help='With --fold all: also store the features of the test subjects.')
+    parser.add_argument('--single', action='store_true',
+                        help='With --fold all: store the hidden layer of this one model for all training and test '
+                             'subjects as unet_single (final test only).')
     parser.add_argument('--config', type=str, default=os.path.join(paths.REPO_DIR, 'configs', 'default.toml'))
     parser.add_argument('--device', type=str, default='cuda')
     parser.add_argument('--steps', type=int, default=6000)
