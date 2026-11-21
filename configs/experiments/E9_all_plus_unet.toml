@@ -1,0 +1,22 @@
+# E9: all hand-crafted feature groups (79 features, as E3_all) plus 16 learned features of a supervised U-Net:
+# the last decoder layer of a small 3D U-Net (DynUNet), from out-of-fold models (no subject sees its own labels).
+# Needs the stored features: scripts/train_unet_features.py (see ubelix/train_unet_features.sbatch).
+
+name = "E9_all_plus_unet"
+
+[features]
+coordinates = true
+intensity = true
+gradient_intensity = true
+intensity_smoothed = true
+gradient_multiscale = true
+texture = true
+spatial = true
+glcm = true
+deep_unet = true
+
+[random_forest]
+n_estimators = 100
+max_depth = "none"
+max_features = "sqrt"
+n_jobs = -1  # all cores; does not change the results

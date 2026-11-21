@@ -51,6 +51,7 @@ NETWORKS = {
     'resnet_imagenet_3planes': (0, 1, 2),  # 2.5D: axial, coronal and sagittal slices, every 4th voxel
     'radimagenet_3planes': (0, 1, 2),
     'autoencoder': (0, 1, 2),    # 3D autoencoder trained on our training subjects (scripts/train_autoencoder.py)
+    'unet': (),                  # supervised 3D U-Net, stored at full resolution (scripts/train_unet_features.py)
 }
 
 
@@ -65,6 +66,8 @@ def upsample(maps: np.ndarray, axes: tuple, shape: tuple) -> np.ndarray:
     Stored value i lies at voxel STRIDE * i (the networks pad only at the end, and the centre of their stride-4
     outputs is the input voxel 4 * i), so voxel v reads the stored grid at v / STRIDE with linear interpolation.
     """
+    if not axes:  # stored at full resolution
+        return maps.astype(np.float32)
     matrix = np.array([1.0 / STRIDE if axis in axes else 1.0 for axis in range(3)])
     result = np.empty((maps.shape[0],) + tuple(shape), dtype=np.float32)
     for i, component in enumerate(maps):
@@ -152,3 +155,16 @@ class AutoEncoder(_DeepFeatures):
     """
     name = 'deep_autoencoder'
     network = 'autoencoder'
+
+
+class UNet(_DeepFeatures):
+    """Last decoder layer (16 channels) of a small supervised 3D U-Net (MONAI DynUNet), trained with labels.
+
+    The U-Net uses labels, so every subject gets its features from an out-of-fold model that never saw it:
+    a training subject from the U-Net trained on the other 4 CV folds, a test subject from the U-Net trained on
+    all 20 training subjects (scripts/train_unet_features.py). For the pipeline the group is therefore not fold
+    dependent. Limitation: the CV results are slightly optimistic, because the U-Nets that made the features of
+    the random forest's training subjects saw the labels of the validation fold. The test results are clean.
+    """
+    name = 'deep_unet'
+    network = 'unet'

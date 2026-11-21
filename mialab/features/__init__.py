@@ -120,6 +120,7 @@ GROUPS = {group.name: group for group in [
     deep.ResNetImageNet3Planes,
     deep.RadImageNet3Planes,
     deep.AutoEncoder,                 # 16 features, 3D autoencoder trained on the training subjects
+    deep.UNet,                        # 16 features, supervised 3D U-Net (out-of-fold models)
 ]}
 
 
