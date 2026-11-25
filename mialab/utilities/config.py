@@ -26,6 +26,11 @@ DEFAULT_CONFIG = {
         'max_features': 'all',
         'n_jobs': 1,
     },
+    # feature selection inside each fold (see mialab/utilities/feature_selection.py); the defaults switch it off
+    'feature_selection': {
+        'n_features': 'all',            # a number, or "all"
+        'correlation_threshold': 1.0,   # drop features with |Spearman r| above this; 1.0 = no filter
+    },
     'postprocessing': {
         'simple': True,
     },
