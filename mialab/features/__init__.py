@@ -120,6 +120,13 @@ GROUPS = {group.name: group for group in [
     deep.ResNetImageNet3Planes,
     deep.RadImageNet3Planes,
     deep.AutoEncoder,                 # 16 features, 3D autoencoder trained on the training subjects
+    deep.UNet,                        # 16 features, supervised 3D U-Net hidden layer (not valid for stacking)
+    deep.UNetProb,                    # 6 features, its tissue probabilities (out-of-fold models)
+    deep.UNetSingle,                  # 16 features, hidden layer of one U-Net on all training subjects (test only)
+    deep.ResNetImageNetLayer1,        # 16 features each: one ImageNet ResNet-50 layer (layer comparison)
+    deep.ResNetImageNetLayer2,
+    deep.ResNetImageNetLayer3,
+    deep.ResNetImageNetLayer4,
     offset.OffsetIntensity,           # 64 features (32 random offsets on T1w and T2w)
     offset.OffsetAtlas,               # 40 features (atlas at 8 random offsets), fitted inside each fold
 ]}

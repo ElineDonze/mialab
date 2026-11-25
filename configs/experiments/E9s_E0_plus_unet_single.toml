@@ -1,0 +1,20 @@
+# E9s: the baseline (7 features) plus the 16 hidden channels (last decoder layer) of ONE supervised U-Net,
+# trained on all 20 training subjects and applied to all subjects, so the channels mean the same everywhere.
+# The U-Net saw the labels of the training subjects: FINAL TEST ONLY (pipeline.py --final-test); the pipeline
+# refuses a cross-validation with this group. See mialab/features/deep.py (UNetSingle).
+# Needs the stored features: scripts/train_unet_features.py --fold all --single.
+# Random forest as in E0 (configs/experiments/E0_baseline.toml).
+
+name = "E9s_E0_plus_unet_single"
+
+[features]
+coordinates = true
+intensity = true
+gradient_intensity = true
+deep_unet_single = true
+
+[random_forest]
+n_estimators = 100
+max_depth = "none"
+max_features = "sqrt"
+n_jobs = -1  # all cores; does not change the results

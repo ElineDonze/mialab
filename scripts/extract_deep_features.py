@@ -21,6 +21,12 @@ What is computed (one network, one subject):
    positions of the 20 training subjects, and stored in the cache; the test subjects are only projected.
 4. The 16 maps are stored as float16 at stride 4. Grid value i lies at voxel 4 * i: the images are padded at the
    end only, and the stride-4 outputs of a ResNet are centred on input voxel 4 * i.
+
+Layer comparison (networks "<2D network>_layer1" ... "_layer4", axial slices): only one layer is used instead of
+the layer1 + layer2 hypercolumns (2 x 256 / 512 / 1024 / 2048 channels at stride 4 / 8 / 16 / 32). The PCA is
+fitted and applied at the layer's own stride, and the 16 maps are then linearly upsampled to the stride-4 grid
+(position i of a stride-s layer lies at voxel s * i). Standardization, PCA and linear interpolation are all
+linear, so this gives the same maps as upsampling the channels first, at a fraction of the memory.
 """
 import argparse
 import json
@@ -44,6 +50,7 @@ IMAGENET_MEAN = (0.485, 0.456, 0.406)
 IMAGENET_STD = (0.229, 0.224, 0.225)
 SLICES_PER_BATCH = 32
 MULTIPLE = 8  # images are padded to a multiple of 8, so layer1 and layer2 have exactly 1/4 and 1/8 of the size
+LAYER_STRIDES = {'layer1': 4, 'layer2': 8, 'layer3': 16, 'layer4': 32}
 
 
 # ----- networks -----
@@ -100,10 +107,14 @@ def load_network(network: str, weights: str):
         raise ValueError(f'Unknown network "{network}"')
     model.eval()
 
-    def forward(batch):
-        layer1 = model.layer1(stem(batch))
-        layer2 = model.layer2(layer1)
-        return layer1, layer2
+    blocks = [model.layer1, model.layer2, model.layer3, model.layer4]
+
+    def forward(batch, n_layers: int = 2):
+        """The outputs of the first ``n_layers`` layers (default: layer1 and layer2)."""
+        outputs = [blocks[0](stem(batch))]
+        for block in blocks[1:n_layers]:
+            outputs.append(block(outputs[-1]))
+        return tuple(outputs)
     return forward
 
 
@@ -140,10 +151,33 @@ def upsample_layer2(layer2: torch.Tensor, size: tuple) -> torch.Tensor:
                  mode='replicate')
 
 
+def upsample_to_stride4(maps: np.ndarray, factor: int, size: tuple) -> np.ndarray:
+    """Axial maps (c, z, h, w) of a stride-(4 * factor) layer to the stride-4 grid (c, z, *size).
+
+    Stride-4 position j reads the layer at j / factor (bilinear, the edges repeat), as upsample_layer2.
+    """
+    x = torch.from_numpy(maps.astype(np.float32)).permute(1, 0, 2, 3)  # slices as the batch
+    if factor > 1:
+        inner = tuple(factor * (s - 1) + 1 for s in x.shape[2:])  # align_corners=True maps j to exactly j / f
+        x = F.interpolate(x, size=inner, mode='bilinear', align_corners=True)
+    # pad (replicate) or crop at the end to the stride-4 grid
+    x = F.pad(x, tuple(p for s, n in zip(reversed(size), reversed(x.shape[2:])) for p in (0, max(s - n, 0))),
+              mode='replicate')[..., :size[0], :size[1]]
+    return x.permute(1, 0, 2, 3).numpy()
+
+
+def single_layer(network: str) -> str:
+    """'resnet_imagenet_layer3' -> 'layer3'; '' for the layer1 + layer2 hypercolumn networks."""
+    suffix = network.rsplit('_', 1)[-1]
+    return suffix if suffix in LAYER_STRIDES else ''
+
+
 # ----- hypercolumns -----
 
 def backbone_and_view(network: str) -> tuple:
     """'radimagenet_3planes' -> ('radimagenet', '3planes'); views: axial, 25d, 3planes (2D networks) or 3d."""
+    if single_layer(network):  # layer comparison: axial slices
+        return network[:-len('_layer1')], 'axial'
     for view in ('25d', '3planes'):
         if network.endswith('_' + view):
             return network[:-len(view) - 1], view
@@ -160,6 +194,24 @@ def run_2d(forward, slices: torch.Tensor, device: str) -> torch.Tensor:
         layer1, layer2 = forward((batch - mean) / std)
         parts.append(torch.cat([layer1, upsample_layer2(layer2, layer1.shape[2:])], 1).half().cpu())
     return torch.cat(parts).permute(1, 0, 2, 3)
+
+
+def run_2d_layer(forward, slices: torch.Tensor, device: str, layer: str) -> torch.Tensor:
+    """2D network on slices (n, 3, h, w) scaled to 0..1: one layer at its own stride, (channels, n, h / s, w / s)."""
+    mean = torch.tensor(IMAGENET_MEAN, device=device).view(1, 3, 1, 1)
+    std = torch.tensor(IMAGENET_STD, device=device).view(1, 3, 1, 1)
+    n_layers = int(layer[-1])
+    parts = []
+    for start in range(0, len(slices), SLICES_PER_BATCH):
+        batch = slices[start:start + SLICES_PER_BATCH].to(device)
+        parts.append(forward((batch - mean) / std, n_layers)[-1].half().cpu())
+    return torch.cat(parts).permute(1, 0, 2, 3)
+
+
+def grid_stride(network: str) -> int:
+    """Stride of the grid on which the network's channels are computed (and the PCA is fitted)."""
+    layer = single_layer(network)
+    return LAYER_STRIDES[layer] if layer else deep.STRIDE
 
 
 @torch.inference_mode()
@@ -191,7 +243,10 @@ def hypercolumns(forward, network: str, images: dict, device: str) -> np.ndarray
                 below = torch.cat([slices[:1], slices[:-1]])
                 above = torch.cat([slices[1:], slices[-1:]])
                 rgb = torch.stack([below, slices, above], 1)
-            columns.append(run_2d(forward, rgb, device))  # (channels, z, y, x)
+            if single_layer(network):  # layer comparison: one layer at its own stride
+                columns.append(run_2d_layer(forward, rgb, device, single_layer(network)))
+            else:
+                columns.append(run_2d(forward, rgb, device))  # (channels, z, y, x)
         else:  # 3planes
             padded = pad_end(scale_2d(volume, mask), (0, 1, 2))
             for axis in range(3):
@@ -201,9 +256,9 @@ def hypercolumns(forward, network: str, images: dict, device: str) -> np.ndarray
     return torch.cat(columns).numpy()
 
 
-def grid_mask(mask: np.ndarray, grid_shape: tuple, axes: tuple) -> np.ndarray:
-    """Brain mask at the grid positions (grid value i lies at voxel 4 * i)."""
-    index = tuple(np.arange(n) * (deep.STRIDE if a in axes else 1) for a, n in enumerate(grid_shape))
+def grid_mask(mask: np.ndarray, grid_shape: tuple, axes: tuple, stride: int = deep.STRIDE) -> np.ndarray:
+    """Brain mask at the grid positions (grid value i lies at voxel stride * i)."""
+    index = tuple(np.arange(n) * (stride if a in axes else 1) for a, n in enumerate(grid_shape))
     inside = tuple(i[i < s] for i, s in zip(index, mask.shape))
     result = np.zeros(grid_shape, dtype=bool)
     result[tuple(slice(0, len(i)) for i in inside)] = mask[np.ix_(*inside)]
@@ -220,7 +275,7 @@ def fit_pca(forward, args, cache, pca_path: str):
         images = cache.load_images(subject, labels=False)
         columns = hypercolumns(forward, args.network, images, args.device)
         mask = grid_mask(sitk.GetArrayFromImage(images['BrainMask']) > 0, columns.shape[1:],
-                         deep.NETWORKS[args.network])
+                         deep.NETWORKS[args.network], grid_stride(args.network))
         positions = np.flatnonzero(mask)
         chosen = rng.choice(positions, size=min(PCA_POSITIONS_PER_SUBJECT, len(positions)), replace=False)
         samples.append(columns.reshape(len(columns), -1)[:, chosen].T.astype(np.float32))
@@ -278,6 +333,10 @@ def main(args):
         grid_shape = columns.shape[1:]
         flat = (columns.reshape(len(columns), -1).T.astype(np.float32) - mean) / scale
         maps = (flat @ components.T).T.reshape((len(components),) + grid_shape).astype(np.float16)
+        if single_layer(args.network):  # PCA was applied at the layer's stride: upsample to the stride-4 grid
+            shape = sitk.GetArrayFromImage(images['T1w']).shape
+            size = tuple((n + (-n) % MULTIPLE) // deep.STRIDE for n in shape[1:])
+            maps = upsample_to_stride4(maps, grid_stride(args.network) // deep.STRIDE, size).astype(np.float16)
         os.makedirs(os.path.dirname(path), exist_ok=True)
         tmp = path + f'.tmp{os.getpid()}.npz'
         np.savez(tmp, maps=maps, shape=np.array(sitk.GetArrayFromImage(images['T1w']).shape),

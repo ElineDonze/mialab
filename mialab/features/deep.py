@@ -51,6 +51,14 @@ NETWORKS = {
     'resnet_imagenet_3planes': (0, 1, 2),  # 2.5D: axial, coronal and sagittal slices, every 4th voxel
     'radimagenet_3planes': (0, 1, 2),
     'autoencoder': (0, 1, 2),    # 3D autoencoder trained on our training subjects (scripts/train_autoencoder.py)
+    'unet': (),                  # supervised 3D U-Net, stored at full resolution (scripts/train_unet_features.py)
+    'unet_prob': (),             # its 6 softmax probabilities, full resolution
+    'unet_single': (),           # hidden layer of ONE U-Net trained on all 20 training subjects (final test only)
+    # layer comparison: one layer of the ImageNet ResNet-50 on axial slices instead of layer1 + layer2
+    'resnet_imagenet_layer1': (1, 2),
+    'resnet_imagenet_layer2': (1, 2),
+    'resnet_imagenet_layer3': (1, 2),
+    'resnet_imagenet_layer4': (1, 2),
 }
 
 
@@ -65,6 +73,8 @@ def upsample(maps: np.ndarray, axes: tuple, shape: tuple) -> np.ndarray:
     Stored value i lies at voxel STRIDE * i (the networks pad only at the end, and the centre of their stride-4
     outputs is the input voxel 4 * i), so voxel v reads the stored grid at v / STRIDE with linear interpolation.
     """
+    if not axes:  # stored at full resolution
+        return maps.astype(np.float32)
     matrix = np.array([1.0 / STRIDE if axis in axes else 1.0 for axis in range(3)])
     result = np.empty((maps.shape[0],) + tuple(shape), dtype=np.float32)
     for i, component in enumerate(maps):
@@ -152,3 +162,77 @@ class AutoEncoder(_DeepFeatures):
     """
     name = 'deep_autoencoder'
     network = 'autoencoder'
+
+
+class _ResNetImageNetLayer(_DeepFeatures):
+    """One layer of the ImageNet ResNet-50 on axial slices (layer comparison), PCA to 16 at the layer's stride."""
+
+
+class ResNetImageNetLayer1(_ResNetImageNetLayer):
+    """Layer1 only (stride 4, 2 x 256 channels)."""
+    name = 'deep_resnet_imagenet_layer1'
+    network = 'resnet_imagenet_layer1'
+
+
+class ResNetImageNetLayer2(_ResNetImageNetLayer):
+    """Layer2 only (stride 8, 2 x 512 channels)."""
+    name = 'deep_resnet_imagenet_layer2'
+    network = 'resnet_imagenet_layer2'
+
+
+class ResNetImageNetLayer3(_ResNetImageNetLayer):
+    """Layer3 only (stride 16, 2 x 1024 channels)."""
+    name = 'deep_resnet_imagenet_layer3'
+    network = 'resnet_imagenet_layer3'
+
+
+class ResNetImageNetLayer4(_ResNetImageNetLayer):
+    """Layer4 only (stride 32, 2 x 2048 channels)."""
+    name = 'deep_resnet_imagenet_layer4'
+    network = 'resnet_imagenet_layer4'
+
+
+class UNet(_DeepFeatures):
+    """Last decoder layer (16 channels) of a small supervised 3D U-Net (MONAI DynUNet), trained with labels.
+
+    The U-Net uses labels, so every subject gets its features from an out-of-fold model that never saw it:
+    a training subject from the U-Net trained on the other 4 CV folds, a test subject from the U-Net trained on
+    all 20 training subjects (scripts/train_unet_features.py). For the pipeline the group is therefore not fold
+    dependent. Limitation: the CV results are slightly optimistic, because the U-Nets that made the features of
+    the random forest's training subjects saw the labels of the validation fold. The test results are clean.
+
+    Not valid for stacking (kept to document this): the 16 hidden channels mean something different in every
+    U-Net, so the random forest is trained on channels of some models and applied to those of another one.
+    Use ``deep_unet_prob`` instead.
+    """
+    name = 'deep_unet'
+    network = 'unet'
+
+
+class UNetSingle(_DeepFeatures):
+    """Last decoder layer (16 channels) of ONE U-Net, trained on all 20 training subjects, for every subject.
+
+    One model for all subjects, so the channels mean the same everywhere (unlike :class:`UNet`). The U-Net saw
+    the labels of the training subjects, so their features are a bit better than those of unseen subjects (Dice
+    0.88 vs 0.85, mostly in the small structures). A cross-validation on these features would leak the labels of
+    the validation fold, so the group is used with ``pipeline.py --final-test`` only.
+    """
+    name = 'deep_unet_single'
+    network = 'unet_single'
+    final_test_only = True  # pipeline.py refuses a cross-validation with this group
+
+
+class UNetProb(_DeepFeatures):
+    """The 6 softmax probabilities of the out-of-fold U-Nets (background + 5 tissues); see :class:`UNet`.
+
+    Unlike the hidden channels, the probabilities mean the same in every U-Net, so this is the valid stacking
+    variant (as in auto-context: the random forest gets the first model's tissue probabilities as features).
+    """
+    name = 'deep_unet_prob'
+    network = 'unet_prob'
+    defaults = {'n_components': 6}
+    LABELS = ('background', 'white_matter', 'grey_matter', 'hippocampus', 'amygdala', 'thalamus')
+
+    def compute_for_subject(self, images, subject_dir):
+        maps = super().compute_for_subject(images, subject_dir)
+        return {f'p_{label}': value for label, value in zip(self.LABELS, maps.values())}

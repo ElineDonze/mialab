@@ -1,0 +1,19 @@
+# E10: the 3 coordinates and the 16 learned features, no other hand-crafted features:
+# the pretrained network resnet_imagenet (layer1 + layer2, PCA to 16).
+# Shows what the learned features know on their own.
+# Needs the stored features: scripts/extract_deep_features.py --network resnet_imagenet.
+# Random forest as in E0 (configs/experiments/E0_baseline.toml).
+
+name = "E10_coords_resnet_imagenet"
+
+[features]
+coordinates = true
+intensity = false
+gradient_intensity = false
+deep_resnet_imagenet = true
+
+[random_forest]
+n_estimators = 100
+max_depth = "none"
+max_features = "sqrt"
+n_jobs = -1  # all cores; does not change the results
