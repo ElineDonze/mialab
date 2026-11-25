@@ -1,0 +1,18 @@
+# E11 (layer comparison): only 16 features from layer3 of the ImageNet ResNet-50, no hand-crafted features
+# (axial slices, 2 x 1024 channels at stride 16, PCA to 16, upsampled). E10_only_resnet_imagenet uses layer1 + layer2.
+# Needs the stored features: scripts/extract_deep_features.py --network resnet_imagenet_layer3.
+# Random forest as in E0 (configs/experiments/E0_baseline.toml).
+
+name = "E11_only_imagenet_layer3"
+
+[features]
+coordinates = false
+intensity = false
+gradient_intensity = false
+deep_resnet_imagenet_layer3 = true
+
+[random_forest]
+n_estimators = 100
+max_depth = "none"
+max_features = "sqrt"
+n_jobs = -1  # all cores; does not change the results
