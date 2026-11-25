@@ -1,0 +1,26 @@
+# E4 (feature selection): all 79 features after the correlation filter only.
+# Feature selection inside each fold on the training data only (mialab/utilities/feature_selection.py):
+# rank by random forest importance, drop features with |Spearman r| > 0.9 to a better one, keep the best n.
+# Settings not listed here keep the values of configs/default.toml.
+
+name = "E4_corr_filter_only"
+
+[features]
+coordinates = true
+intensity = true
+gradient_intensity = true
+intensity_smoothed = true
+gradient_multiscale = true
+texture = true
+spatial = true
+glcm = true
+
+[feature_selection]
+n_features = "all"
+correlation_threshold = 0.9
+
+[random_forest]
+n_estimators = 100
+max_depth = "none"
+max_features = "sqrt"
+n_jobs = -1  # all cores; does not change the results

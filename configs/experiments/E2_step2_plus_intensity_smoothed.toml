@@ -1,0 +1,21 @@
+# E2 (cumulative): E0 + spatial, intensity_smoothed, added in the order of the E1 gain.
+# Steps 1 (E0 + spatial) and 5 (all groups) are E1_spatial and E3_all, so they are not repeated.
+# Settings not listed here keep the values of configs/default.toml.
+
+name = "E2_step2_plus_intensity_smoothed"
+
+[features]
+coordinates = true
+intensity = true
+gradient_intensity = true
+intensity_smoothed = true
+gradient_multiscale = false
+texture = false
+spatial = true
+glcm = false
+
+[random_forest]
+n_estimators = 100
+max_depth = "none"
+max_features = "sqrt"
+n_jobs = -1  # all cores; does not change the results
