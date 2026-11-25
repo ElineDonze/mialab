@@ -1,0 +1,22 @@
+# E7: all hand-crafted feature groups (79 features, as E3_all) plus 16 learned features of an autoencoder:
+# a small 3D autoencoder trained on the 20 training subjects (images only, no labels).
+# Needs the stored features: scripts/train_autoencoder.py (see ubelix/train_autoencoder.sbatch).
+
+name = "E7_all_plus_autoencoder"
+
+[features]
+coordinates = true
+intensity = true
+gradient_intensity = true
+intensity_smoothed = true
+gradient_multiscale = true
+texture = true
+spatial = true
+glcm = true
+deep_autoencoder = true
+
+[random_forest]
+n_estimators = 100
+max_depth = "none"
+max_features = "sqrt"
+n_jobs = -1  # all cores; does not change the results

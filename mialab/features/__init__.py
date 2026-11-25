@@ -71,6 +71,15 @@ class FeatureGroup:
         """
         raise NotImplementedError
 
+    def compute_for_subject(self, images: t.Dict[str, sitk.Image],
+                            subject_dir: str) -> t.Dict[str, t.Union[sitk.Image, np.ndarray]]:
+        """Computes the features of one subject; called by the feature cache.
+
+        Most groups only need the images and use :meth:`compute`. Groups that load features computed elsewhere
+        (e.g. the deep features, see deep.py) override this method to read them from the subject's cache folder.
+        """
+        return self.compute(images)
+
 
 class FitContext:
     """Gives a fold-dependent feature group access to the pre-processed images of the training subjects.
@@ -91,7 +100,7 @@ class FitContext:
 
 
 # The groups are imported here, after FeatureGroup is defined, because they subclass it.
-from mialab.features import baseline, glcm, gradient_multiscale, intensity_smoothed, offset, spatial, texture  # noqa: E402,E501
+from mialab.features import baseline, deep, glcm, gradient_multiscale, intensity_smoothed, offset, spatial, texture  # noqa: E402,E501
 
 #: All feature groups, in the order of their columns in the feature matrix.
 GROUPS = {group.name: group for group in [
@@ -103,6 +112,14 @@ GROUPS = {group.name: group for group in [
     texture.Texture,                  # 32 features
     spatial.Spatial,                  # 6 features, fitted inside each fold
     glcm.Glcm,                        # 20 features (GLCM texture, PyRadiomics definitions)
+    deep.ResNetImageNet,              # 16 features, pretrained 2D network (natural photos)
+    deep.RadImageNet,                 # 16 features, pretrained 2D network (radiology images)
+    deep.MedicalNet,                  # 16 features, pretrained 3D network (medical volumes)
+    deep.ResNetImageNet25D,           # 16 features each: 2.5D variants of the two 2D networks
+    deep.RadImageNet25D,
+    deep.ResNetImageNet3Planes,
+    deep.RadImageNet3Planes,
+    deep.AutoEncoder,                 # 16 features, 3D autoencoder trained on the training subjects
     offset.OffsetIntensity,           # 64 features (32 random offsets on T1w and T2w)
     offset.OffsetAtlas,               # 40 features (atlas at 8 random offsets), fitted inside each fold
 ]}

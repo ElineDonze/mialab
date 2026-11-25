@@ -1,0 +1,13 @@
+# Extra packages for scripts/extract_deep_features.py (deep features, GPU). Install into a separate environment,
+# so the main environment stays small:
+#
+#     uv venv <project>/envs/deepfeat --python 3.11
+#     uv pip install --python <project>/envs/deepfeat/bin/python -r requirements-deep.txt
+#
+# uv links packages from its cache, so PyTorch takes disk space only once for all environments that use the same
+# version. The pipeline itself does not need these packages.
+-r requirements.txt
+torch==2.15.0  # CUDA 13 build on Linux; inference also runs on CPU (about 15 s per subject)
+torchvision==0.29.2
+monai==1.6.1
+huggingface_hub==2.4.0  # downloads the MedicalNet weights
