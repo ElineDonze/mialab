@@ -100,7 +100,7 @@ class FitContext:
 
 
 # The groups are imported here, after FeatureGroup is defined, because they subclass it.
-from mialab.features import baseline, deep, glcm, gradient_multiscale, intensity_smoothed, spatial, texture  # noqa: E402
+from mialab.features import baseline, deep, glcm, gradient_multiscale, intensity_smoothed, offset, spatial, texture  # noqa: E402,E501
 
 #: All feature groups, in the order of their columns in the feature matrix.
 GROUPS = {group.name: group for group in [
@@ -120,6 +120,8 @@ GROUPS = {group.name: group for group in [
     deep.ResNetImageNet3Planes,
     deep.RadImageNet3Planes,
     deep.AutoEncoder,                 # 16 features, 3D autoencoder trained on the training subjects
+    offset.OffsetIntensity,           # 64 features (32 random offsets on T1w and T2w)
+    offset.OffsetAtlas,               # 40 features (atlas at 8 random offsets), fitted inside each fold
 ]}
 
 

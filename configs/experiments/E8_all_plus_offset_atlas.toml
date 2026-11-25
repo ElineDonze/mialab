@@ -1,0 +1,27 @@
+# E8: all 79 features + offset_atlas (the probabilistic atlas read at 8 random offsets, 40 features).
+# Settings not listed here keep the values of configs/default.toml.
+
+name = "E8_all_plus_offset_atlas"
+
+[features]
+coordinates = true
+intensity = true
+gradient_intensity = true
+intensity_smoothed = true
+gradient_multiscale = true
+texture = true
+spatial = true
+glcm = true
+offset_atlas = true
+
+[feature_params.offset_atlas]
+n_offsets = 8          # x 5 tissues: 40 features
+max_offset_mm = 10.0
+sigma = 1.0            # same atlas smoothing as the spatial group
+seed = 1
+
+[random_forest]
+n_estimators = 100
+max_depth = "none"
+max_features = "sqrt"
+n_jobs = -1  # all cores; does not change the results
